@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # PrintHub
 
 A production-structured e-commerce application for a neighbourhood
@@ -235,3 +236,6 @@ With Razorpay test keys, additionally exercise:
   `reconcileStaleAttempts` from a cron) for browser-close recovery even
   when no client is polling.
 - Never commit secrets; all credentials are environment-injected.
+=======
+# PRINTLABS
+>>>>>>> origin/main
