@@ -48,7 +48,23 @@ const globalRef = globalThis as typeof globalThis & {
   __pgSqlPromise__?: Promise<Sql>;
   __pgliteInstance__?: Promise<import("@electric-sql/pglite").PGlite>;
   __pgliteMigrateChain__?: Promise<void>;
+  __pgPool__?: import("pg").Pool;
 };
+
+/**
+ * The shared `pg` Pool (Neon path only) for callers that need a DEDICATED
+ * connection — session-level advisory locks must live on one connection for
+ * their whole lifetime, which the tagged-template client cannot guarantee
+ * (it may use any pool connection per statement). Returns null on PGLite.
+ */
+export function getLockPool(): import("pg").Pool | null {
+  if (dbSource !== "neon") return globalRef.__pgPool__ ?? null;
+  if (!globalRef.__pgPool__) {
+    // Kick pool creation (memoized in createNeonSql); pool loads async.
+    void getSql();
+  }
+  return globalRef.__pgPool__ ?? null;
+}
 
 /**
  * Result-type parity: Postgres sends every value as text plus a type OID — the
@@ -68,6 +84,33 @@ const OID_INTERVAL = 1186;
 const identity = (v: string) => v;
 
 type Run = <T>(text: string, params: unknown[]) => Promise<T[]>;
+
+/**
+ * Migration files by path → SQL text. Vite inlines them via `import.meta.glob`
+ * (no runtime fs in the bundle); when that API is absent — plain `node --test`
+ * through the alias loader — fall back to reading `migrations/*.sql` from disk.
+ * Both produce the same {path: sql} shape keyed the way `pendingMigrations`
+ * expects (basename-tracked).
+ */
+async function loadMigrations(): Promise<Record<string, string>> {
+  if (typeof import.meta.glob === "function") {
+    return import.meta.glob("/migrations/*.sql", {
+      query: "?raw",
+      import: "default",
+      eager: true,
+    }) as Record<string, string>;
+  }
+  const { readdirSync, readFileSync } = await import("node:fs");
+  const { join } = await import("node:path");
+  const root = process.env.PRINTHUB_ROOT || process.cwd();
+  const dir = join(root, "migrations");
+  const out: Record<string, string> = {};
+  for (const name of readdirSync(dir)) {
+    if (!name.endsWith(".sql")) continue;
+    out[join(dir, name).replaceAll("\\", "/")] = readFileSync(join(dir, name), "utf8");
+  }
+  return out;
+}
 
 /** Wrap a query runner in the tagged-template + `.query()` `Sql` surface. */
 function toSql(run: Run): Sql {
@@ -94,6 +137,7 @@ function createNeonSql(): Promise<Sql> {
     types.setTypeParser(OID_DATE, identity);
     types.setTypeParser(OID_INTERVAL, identity);
     const pool = new Pool({ connectionString: databaseUrl });
+    globalRef.__pgPool__ = pool; // shared with getLockPool()
     return toSql(async <T>(text: string, params: unknown[]) => {
       const res = await pool.query(text, params);
       return res.rows as T[];
@@ -137,11 +181,9 @@ async function createPgliteSql(): Promise<Sql> {
   // passes serialized on a global chain so concurrent callers never
   // double-apply.
   const migrate = async (): Promise<void> => {
-    const migrations = import.meta.glob("/migrations/*.sql", {
-      query: "?raw",
-      import: "default",
-      eager: true,
-    }) as Record<string, string>;
+    // SQL is inlined by the bundler on the Vite path; plain Node (tests via
+    // the alias loader) has no import.meta.glob, so read the directory there.
+    const migrations = await loadMigrations();
     const doneRows = await pg.query<{ name: string }>(
       "select name from _migrations",
     );

@@ -33,7 +33,7 @@ Status markers: ☐ not started · ◐ in progress · ☑ done.
 **Accept:** `npm test` exits 0 with the scripts tests actually counted
 (221 + 55, exit 0). ☑
 
-## Phase 2 — Real Razorpay integration ☐
+## Phase 2 — Real Razorpay integration ◐
 
 **Goal:** Replace the built-in sandbox provider with Razorpay test keys.
 
@@ -67,7 +67,15 @@ invoice; cancel/dismiss paths leave the order payable again.
 **Accept:** Replay of the same capture webhook twice yields one invoice;
 the race matrix passes.
 
-## Phase 4 — Concurrency stress suite ☐
+## Phase 4 — Concurrency stress suite ◐
+
+**Data-layer suite done (2026-09-26):** `scripts/concurrency-stress.test.mjs`
+proves the invariants against the real DB — parallel `withLock` callers never
+overlap, timed-out waiters reject without running, parallel idempotent writes
+converge to one stored response, and the stock guard clause never oversells
+(10 parallel buyers × 5 units → exactly 5 winners). Remaining (HTTP layer,
+needs the dev server): 10 parallel `startPayment`/`verifyPayment` calls and
+the two-session double-checkout simulation.
 
 **Goal:** Lock in the payment invariants under load.
 
@@ -82,7 +90,13 @@ the race matrix passes.
 
 **Accept:** Suite runs in CI mode; all invariants hold.
 
-## Phase 5 — Admin dashboard ☐
+## Phase 5 — Admin dashboard ◐
+
+**Server side done (2026-09-26):** `src/lib/api/admin.ts` — every function
+authenticates via `authMiddleware` then re-checks the DB role (`isAdmin`), so
+a non-admin gets 403 on every surface. Product upsert/create, service
+updates, admin order list + audit-log reader, role management, and the
+fulfillment transition endpoint (guards below). UI remains.
 
 **Goal:** Expose the existing USER/ADMIN architecture.
 
@@ -99,7 +113,15 @@ the race matrix passes.
 **Accept:** A non-admin gets 403/404 on every admin surface; state
 transitions respect `ORDER_TRANSITIONS`.
 
-## Phase 6 — Order fulfillment lifecycle ☐
+## Phase 6 — Order fulfillment lifecycle ◐
+
+**Server side done (2026-09-26):** `adminSetOrderStatus` advances
+CONFIRMED → PROCESSING → READY → COMPLETED (and CANCELLED, which releases
+stock for unpaid orders) through the same `ORDER_TRANSITIONS` machine the
+payment pipeline uses — illegal jumps are 409s. Fulfilled-by/at and
+cancel-reason are persisted (`migrations/0004`). Customer status email fires
+fire-and-forget. Customer-side status rendering already exists on
+`/orders/$id`. Admin UI remains.
 
 **Goal:** Operate the post-payment states meaningfully.
 
@@ -110,7 +132,18 @@ transitions respect `ORDER_TRANSITIONS`.
 **Accept:** An order can travel CONFIRMED → COMPLETED through the UI
 without violating the machine.
 
-## Phase 7 — Transactional email ☐
+## Phase 7 — Transactional email ◐
+
+**Service done (2026-09-26):** `src/lib/server/email.ts` — SMTP via
+`nodemailer` behind `MAIL_*` env vars (`MAIL_SERVER`/`MAIL_PORT`/
+`MAIL_SECURE`/`MAIL_USER`/`MAIL_PASSWORD`/`MAIL_FROM`); unset `MAIL_SERVER`
+selects a logged no-op so dev/preview need zero config. Wired:
+password-reset (replacing the console stub), order confirmation +
+invoice-ready (sent once from the idempotent `finalizePaid`, covering both
+the browser-verify and webhook paths), and admin status changes. Contract
+holds: sends are fire-and-forget, transport failures are swallowed and
+logged (`{ sent: false }`), and no-disclosure reset copy stays caller-owned.
+Remaining: a real SMTP deliverability check (Phase 12 smoke).
 
 **Goal:** Replace the console-logging mail stub.
 
@@ -124,7 +157,17 @@ without violating the machine.
 **Accept:** Reset email arrives with a working single-use link; an order
 confirmation arrives after PAID.
 
-## Phase 8 — Multi-instance readiness ☐
+## Phase 8 — Multi-instance readiness ◐
+
+**Done (2026-09-26):** `src/lib/server/locks.ts` now takes **Postgres
+session-level advisory locks** on a dedicated pooled connection
+(`getLockPool()` added to `db.ts`) — cross-instance serialization with zero
+new infra; PGLite/preview keeps an in-process mutex. The rate limiter is
+shared: a `rate_limit_counters` table (`migrations/0004`) with an atomic
+upsert-increment, in-memory fallback when the store is unavailable, and the
+sync variant preserved for preview. Cache strategy documented: the TTL cache
+is catalog-only and per-process-safe. Remaining: the two-instance Phase 4
+HTTP acceptance run.
 
 **Goal:** Remove single-node assumptions for horizontal scale.
 
@@ -139,7 +182,15 @@ confirmation arrives after PAID.
 **Accept:** Two app instances behind a load balancer pass the Phase 4
 stress suite.
 
-## Phase 9 — Security hardening pass ☐
+## Phase 9 — Security hardening pass ◐
+
+**Headers done (2026-09-26):** `src/lib/server/security-headers.ts` defines
+CSP (self + Razorpay checkout/api/frame hosts, fonts), HSTS over https only,
+nosniff, Referrer-Policy, Permissions-Policy, and frame-ancestors 'none';
+stamped on every dev response by `securityHeadersPlugin` in vite.config.ts
+and on deployed responses by `server/middleware/security.ts` (Nitro
+global middleware). Remaining: dependency audit, secret-rotation docs,
+audit-log retention review (needs the Phase 5 admin UI).
 
 **Goal:** Close remaining production gaps.
 

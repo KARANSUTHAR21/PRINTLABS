@@ -43,16 +43,19 @@ function Home() {
           { icon: "store", label: "Wide Range of Stationery" },
         ]}
       >
-        <div className="pointer-events-none absolute inset-x-0 bottom-3 z-10 hidden flex-col items-center gap-1 lg:flex">
-          <ArrowDown className="size-4 text-ink/60" />
-          <p className="text-[0.84rem] text-ink/60">Explore Our Services</p>
+        {/* Reference: the shortcut cards float over the photo's bottom edge. */}
+        <div className="lg:absolute lg:inset-x-0 lg:bottom-[2.875rem] lg:z-10">
+          <div className="pointer-events-none hidden flex-col items-center gap-2 pb-[1.15rem] lg:flex">
+            <ArrowDown className="size-4 text-ink/70" />
+            <p className="text-[0.95rem] text-ink/70">Explore Our Services</p>
+          </div>
+          <div className="container-rail grid gap-5 pb-12 sm:grid-cols-2 lg:grid-cols-4 lg:pb-0">
+            {shortcuts.map((s) => (
+              <ServiceShortcut key={s.id} service={s} />
+            ))}
+          </div>
         </div>
       </PageHero>
-      <section className="container-rail mt-1.5 grid gap-5 pb-12 sm:grid-cols-2 lg:grid-cols-4">
-        {shortcuts.map((s) => (
-          <ServiceShortcut key={s.id} service={s} />
-        ))}
-      </section>
     </main>
   );
 }

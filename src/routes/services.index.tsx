@@ -30,9 +30,9 @@ function ServicesPage() {
           { icon: "store", label: "Wide Range of Solutions" },
         ]}
       />
-      <section className="container-page py-10">
-        <div className="mb-4 flex items-end justify-between gap-4">
-          <h2 className="text-[1.65rem] font-extrabold tracking-tight">Our Services</h2>
+      <section className="container-page pt-4 pb-[0.75rem]">
+        <div className="mb-[0.6rem] flex items-end justify-between gap-4">
+          <h2 className="text-[1.6rem] font-extrabold tracking-tight">Our Services</h2>
           <p className="text-[0.95rem] text-muted">Professional. Affordable. Convenient.</p>
         </div>
         {error && <p className="text-sm text-danger">{error}</p>}
@@ -45,7 +45,7 @@ function ServicesPage() {
           ))}
         </div>
       </section>
-      <div className="mt-5 pb-8">
+      <div className="pb-8">
         <TrustBar
           items={[
             { icon: "truck", title: "Quick Turnaround", hint: "Same day service" },

@@ -52,6 +52,49 @@ function pgliteBootstrapPlugin(): Plugin {
 }
 
 /**
+ * Dev-server security headers (spec Phase 9) — mirrors
+ * `server/middleware/security.ts`, which stamps the same set on deployed
+ * responses. Registered before TanStack Start so every document/API response
+ * leaving the dev server carries them.
+ */
+function securityHeadersPlugin(): Plugin {
+  return {
+    name: "app-builder:security-headers",
+    apply: "serve",
+    configureServer(server) {
+      server.middlewares.use(async (req, res, next) => {
+        try {
+          const proto = String(
+            req.headers["x-forwarded-proto"] ??
+              ((req.socket as { encrypted?: boolean } | undefined)?.encrypted ? "https" : "http"),
+          );
+          const host = String(req.headers["x-forwarded-host"] ?? req.headers.host ?? "localhost:8080");
+          const { securityHeaders } = (await server.ssrLoadModule("/src/lib/server/security-headers.ts")) as {
+            securityHeaders: (origin: string) => Record<string, string>;
+          };
+          const originalWriteHead = res.writeHead.bind(res);
+          const headers = securityHeaders(`${proto}://${host}`);
+          // Stamp on every writeHead so redirects and API replies are covered.
+          // @ts-expect-error overloads vary across Node types
+          res.writeHead = (...args: unknown[]) => {
+            for (const [k, v] of Object.entries(headers)) {
+              if (!res.getHeader(k)) res.setHeader(k, v);
+            }
+            return originalWriteHead(...(args as Parameters<typeof originalWriteHead>));
+          };
+          res.on("close", () => {
+            res.writeHead = originalWriteHead;
+          });
+        } catch {
+          /* headers are hardening — never block the response */
+        }
+        next();
+      });
+    },
+  };
+}
+
+/**
  * Live-preview OAuth popup — handled HERE so the agent never has to create a
  * `/auth/popup` route (and cannot break it by scaffolding a React page that
  * paints the full app shell in the popup).
@@ -159,6 +202,8 @@ export default defineConfig(({ command, isPreview }) => ({
   resolve: { tsconfigPaths: true },
   plugins: [
     pgliteBootstrapPlugin(),
+    // CSP/HSTS/nosniff on every dev response (deployed: server/middleware/security.ts).
+    securityHeadersPlugin(),
     // Before tanstackStart so /auth/popup never falls through to the SPA.
     authPopupPlugin(),
     // Dev-only /__app-env, read by scripts/check-auth-invariant.mjs.

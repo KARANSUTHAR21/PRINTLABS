@@ -48,6 +48,7 @@ function ProductsPage() {
     <main>
       <PageHero
         eyebrow="Quality products. Everyday."
+        titleClassName="lg:text-[3.5rem]"
         title={
           <>
             Stationery,

@@ -1,3 +1,9 @@
+/**
+ * Legacy guest-cart storage. Cart mutations are signed-in only now; this module
+ * remains so a guest cart saved by an older build can still be **merged** into
+ * the user's server cart right after sign-in (see `CartProvider`). Nothing
+ * writes to the key anymore — `read` + `clear` are all that survive.
+ */
 const KEY = "printhub.guest-cart.v1";
 
 export type GuestLine = { productId: string; quantity: number };
@@ -15,33 +21,7 @@ export function readGuestCart(): GuestLine[] {
   }
 }
 
-export function writeGuestCart(items: GuestLine[]) {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(KEY, JSON.stringify(items));
-}
-
 export function clearGuestCart() {
   if (typeof window === "undefined") return;
   window.localStorage.removeItem(KEY);
-}
-
-export function upsertGuest(productId: string, quantity: number, mode: "add" | "set"): GuestLine[] {
-  const items = readGuestCart();
-  const idx = items.findIndex((l) => l.productId === productId);
-  let next = items;
-  if (mode === "add") {
-    if (idx >= 0) {
-      next = items.map((l, i) => (i === idx ? { ...l, quantity: l.quantity + quantity } : l));
-    } else {
-      next = [...items, { productId, quantity }];
-    }
-  } else if (quantity <= 0) {
-    next = items.filter((l) => l.productId !== productId);
-  } else if (idx >= 0) {
-    next = items.map((l, i) => (i === idx ? { ...l, quantity } : l));
-  } else {
-    next = [...items, { productId, quantity }];
-  }
-  writeGuestCart(next);
-  return next;
 }

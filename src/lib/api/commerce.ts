@@ -128,7 +128,7 @@ export const placeOrder = createServerFn({ method: "POST" })
   )
   .handler(async ({ context, data }): Promise<ApiResult<{ order: OrderRecord }>> => {
     try {
-      if (!rateLimit(clientKey(context.userId, "order"), 8, 60_000)) {
+      if (!(await rateLimit(clientKey(context.userId, "order"), 8, 60_000))) {
         fail("Too many order attempts. Please wait.", 429);
       }
       const order = await createOrderFromCart(context.userId, data.idempotencyKey, data.customer);
@@ -170,7 +170,7 @@ export const startPayment = createServerFn({ method: "POST" })
   )
   .handler(async ({ context, data }): Promise<ApiResult<{ session: PaymentSession }>> => {
     try {
-      if (!rateLimit(clientKey(context.userId, "pay"), 10, 60_000)) {
+      if (!(await rateLimit(clientKey(context.userId, "pay"), 10, 60_000))) {
         fail("Too many payment attempts. Please wait.", 429);
       }
       const session = await createPaymentSession(context.userId, data.orderId, data.idempotencyKey);
@@ -194,7 +194,7 @@ export const verifyPayment = createServerFn({ method: "POST" })
   )
   .handler(async ({ context, data }): Promise<ApiResult<{ order: OrderRecord; already: boolean }>> => {
     try {
-      if (!rateLimit(clientKey(context.userId, "verify"), 20, 60_000)) {
+      if (!(await rateLimit(clientKey(context.userId, "verify"), 20, 60_000))) {
         fail("Too many verification attempts.", 429);
       }
       const result = await verifyFrontendPayment({ ...data, userId: context.userId });

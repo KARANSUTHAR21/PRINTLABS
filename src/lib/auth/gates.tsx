@@ -1,5 +1,6 @@
 import { useState, useSyncExternalStore, type ReactNode } from "react";
 import { Navigate } from "@tanstack/react-router";
+import { LogOut } from "lucide-react";
 import { GROK_PROVIDERS, authEnabled, signIn, signOut } from "./client";
 import { hasGateSessionMarker } from "./gate-session-marker";
 import { resolveSignInGateState } from "./sign-in-gate";
@@ -81,17 +82,26 @@ export function SignInButtons() {
 }
 
 /**
- * Minimal signed-in identity chip + sign-out. Restyle freely (see the
- * `design-ui` skill). Sign-out is only shown when auth is enabled (the
- * disabled-auth dev user has nothing to sign out of) and the session is not
- * gate-materialized — behind the gate the next request signs the viewer
- * straight back in, so a sign-out control there is a broken loop.
+ * Signed-in identity chip + a full-width **Logout button**.
+ *
+ * The button closes the session for real, in whichever mode the app runs:
+ * - **Bearer-token session** (live preview / stripped-cookie dev): revokes the
+ *   token server-side AND removes it from `sessionStorage` (`signOut()` in
+ *   `./client` → `runSignOut`) — an expired/removed token is unusable, which is
+ *   the JWT expiry the logout promises.
+ * - **Cookie session** (deployed): Better Auth's sign-out endpoint terminates
+ *   the server session and clears the `__Host-` cookie. The call is confirmed
+ *   before any redirect — a failed or timed-out sign-out throws instead of
+ *   pretending, so the button surfaces a retryable error rather than a lie.
+ * A gate-materialized session hides the button: the next request would sign
+ * the viewer straight back in, making logout a broken loop.
  */
 export function UserButton() {
   const user = useCurrentUser();
   // Sign-out can take a moment (and can fail when deployed), so the control
-  // shows it is working and cannot be fired twice.
+  // shows it is working, cannot be fired twice, and reports failure for retry.
   const [signingOut, setSigningOut] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const gateSession = useSyncExternalStore(
     subscribeToNothing,
     hasGateSessionMarker,
@@ -99,33 +109,51 @@ export function UserButton() {
   );
   if (!user) return null;
   const label = user.displayName ?? user.primaryEmail ?? "Account";
+
+  const handleSignOut = () => {
+    setSigningOut(true);
+    setError(null);
+    // Success navigates away (runSignOut redirects); on failure re-enable and
+    // show why, so the session-ending step can be retried.
+    signOut()
+      .catch((err: unknown) => {
+        setSigningOut(false);
+        setError(err instanceof Error ? err.message : "Logout failed — try again.");
+      });
+  };
+
   return (
-    <div className="flex items-center gap-2">
-      {user.profileImageUrl ? (
-        <img
-          src={user.profileImageUrl}
-          alt=""
-          className="h-8 w-8 rounded-full object-cover"
-        />
-      ) : (
-        <span className="grid h-8 w-8 place-items-center rounded-full bg-black/10 text-sm font-medium dark:bg-white/20">
-          {label.charAt(0).toUpperCase()}
-        </span>
-      )}
-      <span className="text-sm font-medium">{label}</span>
+    <div className="w-full">
+      <div className="mb-2 flex items-center gap-2">
+        {user.profileImageUrl ? (
+          <img
+            src={user.profileImageUrl}
+            alt=""
+            className="h-8 w-8 rounded-full object-cover"
+          />
+        ) : (
+          <span className="grid h-8 w-8 place-items-center rounded-full bg-canvas text-sm font-bold text-ink">
+            {label.charAt(0).toUpperCase()}
+          </span>
+        )}
+        <span className="truncate text-sm font-medium text-ink">{label}</span>
+      </div>
       {authEnabled && !gateSession && (
         <button
           type="button"
+          onClick={handleSignOut}
           disabled={signingOut}
-          onClick={() => {
-            setSigningOut(true);
-            // Success navigates away; on failure re-enable so it can be retried.
-            void signOut().catch(() => setSigningOut(false));
-          }}
-          className="cursor-pointer text-sm underline-offset-4 opacity-70 hover:underline disabled:cursor-wait disabled:no-underline"
+          aria-busy={signingOut}
+          className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-md bg-canvas px-3 py-2 text-sm font-semibold text-danger transition-colors hover:bg-mist disabled:cursor-wait disabled:opacity-60"
         >
-          {signingOut ? "Signing out…" : "Sign out"}
+          <LogOut className="size-4" aria-hidden />
+          {signingOut ? "Logging out…" : "Log out"}
         </button>
+      )}
+      {error && (
+        <p role="alert" className="mt-2 text-xs leading-snug text-danger">
+          {error}
+        </p>
       )}
     </div>
   );

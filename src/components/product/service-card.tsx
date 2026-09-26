@@ -41,7 +41,7 @@ export function ServiceCard({ service }: { service: ServiceRow }) {
   );
 }
 
-/** Home hero shortcut tile: outlined icon, title and subtitle, tall and airy. */
+/** Home hero shortcut tile: outlined icon, title and subtitle — 98px tall in the reference. */
 export function ServiceShortcut({
   service,
 }: {
@@ -52,14 +52,14 @@ export function ServiceShortcut({
     <Link
       to="/services/$slug"
       params={{ slug: service.slug }}
-      className="card-surface flex min-h-[8.5rem] items-center gap-7 px-6 py-6 transition-colors hover:border-muted-2"
+      className="card-surface flex min-h-[6.125rem] items-center gap-[1.95rem] px-7 py-7 transition-colors hover:border-muted-2"
     >
-      <Icon className="size-9 shrink-0 text-ink" strokeWidth={1.5} />
+      <Icon className="size-10 shrink-0 text-ink" strokeWidth={1.5} />
       <span className="min-w-0">
-        <span className="block truncate text-[1rem] font-bold leading-tight text-ink">
+        <span className="block truncate text-[0.95rem] font-bold leading-tight text-ink">
           {service.title}
         </span>
-        <span className="mt-1.5 block truncate text-[0.875rem] leading-snug text-muted">
+        <span className="mt-1 block truncate text-[0.85rem] leading-snug text-muted">
           {service.subtitle}
         </span>
       </span>

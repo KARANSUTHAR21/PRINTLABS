@@ -21,6 +21,9 @@ const NAV = [
 /** The reference auth screens carry the logo alone — no tagline. */
 const AUTH_ROUTES = ["/login", "/register", "/forgot-password", "/reset-password"];
 
+/** Reference tagline: bold middots with generous spacing between words. */
+const TAGLINE = ["Print", "Copy", "Scan", "Stationery", "All in One"];
+
 export function Header() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { cart } = useCart();
@@ -36,11 +39,16 @@ export function Header() {
   return (
     <header className="sticky top-0 z-40 border-b border-line-soft bg-paper/95 backdrop-blur">
       <div className="container-page flex h-[4.6rem] items-center gap-4">
-        <div className="flex min-w-0 items-center gap-8">
-          <Logo className="text-[1.9rem]" />
+        <div className="flex min-w-0 items-center gap-[2.45rem]">
+          <Logo className="text-[2.2rem]" />
           {showTagline && (
-            <p className="hidden truncate text-[0.9rem] text-muted lg:block">
-              Print · Copy · Scan · Stationery · All in One
+            <p className="hidden items-center gap-[0.62rem] text-[0.86rem] text-muted lg:flex">
+              {TAGLINE.map((word, index) => (
+                <span key={word} className="flex items-center gap-[0.62rem]">
+                  {index > 0 && <span aria-hidden>&bull;</span>}
+                  <span>{word}</span>
+                </span>
+              ))}
             </p>
           )}
         </div>
@@ -85,7 +93,7 @@ export function Header() {
               >
                 <ShoppingCart className="size-5" />
                 {cart.count > 0 && (
-                  <span className="absolute -right-0.5 -top-0.5 grid min-w-[1.15rem] place-items-center rounded-full bg-primary px-1 text-[10.5px] font-bold leading-[1.15rem] text-primary-fg">
+                  <span className="absolute -top-0.5 right-1 grid size-[1.3rem] place-items-center rounded-full bg-primary text-[11.5px] font-bold leading-none text-primary-fg">
                     {cart.count}
                   </span>
                 )}

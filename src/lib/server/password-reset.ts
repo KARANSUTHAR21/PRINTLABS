@@ -1,6 +1,7 @@
 import { getSql } from "@/lib/db";
 import { env } from "@/lib/env.server";
 import { newId, randomToken, sha256 } from "./crypto-utils";
+import { sendPasswordResetMail } from "./email";
 import { fail } from "./errors";
 import { rateLimit } from "./rate-limit";
 
@@ -9,7 +10,7 @@ const GENERIC =
 
 export async function requestPasswordReset(email: string) {
   const normalized = email.trim().toLowerCase();
-  if (!rateLimit(`forgot:${normalized}`, 5, 15 * 60_000)) {
+  if (!(await rateLimit(`forgot:${normalized}`, 5, 15 * 60_000))) {
     fail("Too many reset requests. Try again later.", 429);
   }
   const sql = await getSql();
@@ -24,25 +25,18 @@ export async function requestPasswordReset(email: string) {
       insert into password_resets (id, user_id, email, token_hash, expires_at)
       values (${newId("rst")}, ${users[0].id}, ${normalized}, ${tokenHash}, ${expires})
     `;
-    const base = env("FRONTEND_URL") || "";
+    const base = env("FRONTEND_URL") || "http://localhost:8080";
     const link = `${base}/reset-password/${token}`;
-    await sendResetMail(normalized, link);
+    // Fire-and-forget: a mail outage must not turn into a user enumeration
+    // oracle or slow the response (spec §75 — failures never fail the flow).
+    void sendPasswordResetMail(normalized, link);
   }
   return { message: GENERIC };
 }
 
-async function sendResetMail(to: string, link: string) {
-  const host = env("MAIL_SERVER");
-  if (!host) {
-    console.info("[printhub] password reset (email not configured)", to, link);
-    return;
-  }
-  console.info("[printhub] would send reset mail via SMTP", host, to);
-}
-
 export async function resetPasswordWithToken(token: string, newPassword: string) {
   if (newPassword.length < 8) fail("Password must be at least 8 characters.", 422);
-  if (!rateLimit(`reset:${token.slice(0, 8)}`, 8, 15 * 60_000)) {
+  if (!(await rateLimit(`reset:${token.slice(0, 8)}`, 8, 15 * 60_000))) {
     fail("Too many reset attempts. Try again later.", 429);
   }
   const sql = await getSql();

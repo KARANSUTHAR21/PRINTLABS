@@ -1,6 +1,7 @@
 import { getSql, type Sql } from "@/lib/db";
 import { audit } from "./audit";
 import { newId } from "./crypto-utils";
+import { sendInvoiceReadyMail, sendOrderConfirmationMail } from "./email";
 import { fail } from "./errors";
 import { readIdempotent, writeIdempotent } from "./idempotency";
 import { ensureInvoice } from "./invoices";
@@ -106,7 +107,16 @@ export async function finalizePaid(input: {
 
   if (attempt.status !== "PAID") {
     const from = attempt.status;
-    if (!canTransitionPayment(from, "PAID")) {
+    // A verified provider capture may arrive while the attempt is still
+    // PAYMENT_INITIATED (webhook-only recovery: the buyer paid and the browser
+    // never got to markPaymentOpen — spec race matrix case 3). The machine has
+    // no INITIATED→PAID edge, so walk the legal INITIATED→PROCESSING step
+    // first; PROCESSING→PAID then applies as usual.
+    if (!canTransitionPayment(from, "PAID") && canTransitionPayment(from, "PROCESSING")) {
+      await setAttemptStatus(sql, attempt.id, from, "PROCESSING");
+    }
+    const current = (await getAttempt(sql, attempt.id))?.status ?? from;
+    if (!canTransitionPayment(current, "PAID")) {
       fail("Payment cannot be captured in its current state.", 409);
     }
     await sql`
@@ -131,7 +141,7 @@ export async function finalizePaid(input: {
 
   const paid = await getOrderForUser(order.id, order.userId, true);
   if (!paid) fail("Order missing after payment.", 500);
-  await ensureInvoice(paid, input.razorpayPaymentId);
+  const invoice = await ensureInvoice(paid, input.razorpayPaymentId);
   await audit(sql, {
     eventType: "payment_verified",
     orderId: order.id,
@@ -140,8 +150,34 @@ export async function finalizePaid(input: {
     status: "PAID",
     metadata: { razorpayPaymentId: input.razorpayPaymentId },
   });
+  // Transactional mail is fire-and-forget (Phase 7): a send failure must never
+  // fail a paid order. `finalizePaid` runs for BOTH the browser verify path and
+  // the webhook path, so the customer is mailed exactly once — whichever path
+  // wins the idempotent finalize (the loser returns early at `already`).
+  void notifyOrderPaid(paid, invoice.invoiceNumber);
   const fresh = await getOrderForUser(order.id, order.userId, true);
   return { order: fresh ?? paid, already: false };
+}
+
+/** Best-effort customer notifications after a payment lands. Never throws. */
+async function notifyOrderPaid(order: OrderRecord, invoiceNumber: string | null) {
+  try {
+    const email = order.customer.email;
+    if (!email) return;
+    await sendOrderConfirmationMail({
+      to: email,
+      orderId: order.id,
+      invoiceNumber,
+      items: order.items,
+      totalPaise: order.totalPaise,
+      customerName: [order.customer.firstName, order.customer.lastName].filter(Boolean).join(" "),
+    });
+    if (invoiceNumber) {
+      await sendInvoiceReadyMail({ to: email, orderId: order.id, invoiceNumber });
+    }
+  } catch (err) {
+    console.error("[email] order notification failed:", err instanceof Error ? err.message : err);
+  }
 }
 
 export async function createPaymentSession(

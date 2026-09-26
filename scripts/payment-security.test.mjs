@@ -53,24 +53,28 @@ test("order ids are public-format and collision-resistant", () => {
   const ids = new Set();
   for (let i = 0; i < 200; i += 1) {
     const id = crypto.newPublicOrderId();
-    assert.match(id, /^PH-/);
+    // PH-<base36 timestamp>-<10 hex chars> — never a hash (Razorpay receipt cap
+    // is 40 chars), and the 40-bit random suffix makes enumeration infeasible.
+    assert.match(id, /^PH-[A-Z0-9]+-[A-F0-9]{10}$/);
+    assert.ok(id.length <= 40, "must stay within the Razorpay receipt length cap");
     ids.add(id);
   }
   assert.equal(ids.size, 200);
 });
 
-test("rate limiter allows the burst then blocks", () => {
+test("rate limiter allows the burst then blocks", async () => {
   const key = `test:${Math.random()}`;
   let allowed = 0;
   for (let i = 0; i < 15; i += 1) {
-    if (rateLimit(key, 5, 60_000)) allowed += 1;
+    // rateLimit is async (shared Postgres counter, Phase 8) — await each hit.
+    if (await rateLimit(key, 5, 60_000)) allowed += 1;
   }
   assert.equal(allowed, 5);
 });
 
 test("rate limiter window expires", async () => {
   const key = `test-window:${Math.random()}`;
-  for (let i = 0; i < 5; i += 1) rateLimit(key, 5, 30);
+  for (let i = 0; i < 5; i += 1) await rateLimit(key, 5, 30);
   await new Promise((r) => setTimeout(r, 45));
-  assert.equal(rateLimit(key, 5, 30), true);
+  assert.equal(await rateLimit(key, 5, 30), true);
 });

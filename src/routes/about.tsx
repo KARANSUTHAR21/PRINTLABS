@@ -9,6 +9,7 @@ function AboutPage() {
     <main>
       <PageHero
         eyebrow="People. Print. Progress."
+        titleClassName="lg:text-[3.5rem]"
         title="About PrintHub"
         description="We're more than just a print shop — we're your neighbourhood partner for all things print, copy, scan and stationery. Our goal is simple: to make everyday printing easy, reliable and accessible for everyone."
         action={

@@ -76,9 +76,12 @@ function ProductDetails() {
               type="button"
               className="btn-navy"
               disabled={!inStock}
-              onClick={async () => {
-                await add(product.id, qty);
-                void navigate({ to: "/checkout" });
+              onClick={() => {
+                // Only proceed when the item is really in the cart — an
+                // unauthenticated visitor is bounced to sign-in instead.
+                void add(product.id, qty).then((ok) => {
+                  if (ok) void navigate({ to: "/checkout" });
+                });
               }}
             >
               Buy Now
