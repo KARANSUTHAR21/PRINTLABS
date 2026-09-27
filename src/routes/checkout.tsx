@@ -4,9 +4,10 @@ import { Protected } from "@/components/auth/protected";
 import { useCart } from "@/components/cart/cart-provider";
 import { PaymentButton } from "@/components/payment/payment-button";
 import {
+  cancelPendingOrder,
   emptyCart,
-  loadOrders,
   loadPaymentStatus,
+  loadPendingOrder,
   loadProfile,
   placeOrder,
 } from "@/lib/api/commerce";
@@ -59,30 +60,15 @@ function CheckoutPage() {
     });
   }, [user?.primaryEmail]);
 
-  // Refresh behavior (spec §38): if a pending order already exists (e.g. the
-  // user refreshed or came back after paying in another tab), resume it instead
-  // of silently creating another one.
+  // Refresh behavior (spec §38): if an unfinished checkout already exists (e.g.
+  // the user refreshed, or came back after paying in another tab), resume it
+  // instead of silently creating a second order. The server decides whether the
+  // unfinished order still matches the cart, so both paths agree on one rule.
   useEffect(() => {
-    void loadOrders().then((res) => {
-      if (!res.success) return;
-      const pending = res.orders.find(
-        (o) =>
-          o.orderStatus === "PENDING_PAYMENT" ||
-          o.orderStatus === "PAYMENT_PROCESSING" ||
-          o.paymentStatus === "PAID" && o.orderStatus === "CONFIRMED" && o.invoiceNumber === null,
-      );
-      if (!pending) return;
-      if (pending.paymentStatus === "PAID") {
-        setOrder(pending);
-      } else if (cart.items.length === 0) {
-        // Nothing left in the cart — surface the pending order so the user can
-        // pay it (or abandon it from the payment step).
-        setResuming(pending);
-      } else if (pending.totalPaise === cart.totalPaise) {
-        setOrder(pending);
-      } else {
-        setResuming(pending);
-      }
+    void loadPendingOrder().then((res) => {
+      if (!res.success || !res.order) return;
+      if (res.matchesCart) setOrder(res.order);
+      else setResuming(res.order);
     });
     // Run once on mount — a cart change after mount should not hijack the flow.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -98,6 +84,12 @@ function CheckoutPage() {
     setBusy(false);
     if (!res.success) {
       setError(res.message);
+      // A different unfinished checkout must never be a dead end: show it, with
+      // its items, so the user can pay it or cancel it and continue.
+      if (res.code === "PENDING_ORDER") {
+        const pending = await loadPendingOrder();
+        if (pending.success && pending.order) setResuming(pending.order);
+      }
       return;
     }
     placedKey.current = null;
@@ -106,11 +98,24 @@ function CheckoutPage() {
     await refresh();
   }
 
-  const abandon = useCallback(async () => {
-    setOrder(null);
+  /**
+   * Cancel the unfinished order for real (it stops holding stock and stops
+   * blocking a new checkout) — `abandon` alone only hid it locally, so the
+   * next attempt hit the same "unfinished payment" wall.
+   */
+  const cancelResume = useCallback(async () => {
+    if (!resuming) return;
+    setBusy(true);
+    const res = await cancelPendingOrder({ data: { orderId: resuming.id } });
+    setBusy(false);
+    if (!res.success) {
+      setError(res.message);
+      return;
+    }
+    setError("");
     setResuming(null);
     await refresh();
-  }, [refresh]);
+  }, [refresh, resuming]);
 
   if (!order && !resuming && cart.items.length === 0) {
     return (
@@ -128,14 +133,40 @@ function CheckoutPage() {
     return (
       <main className="container-page max-w-2xl py-16">
         <h1 className="text-3xl font-extrabold">Resume payment</h1>
+        <p className="mt-3 text-sm text-muted">
+          You have an unfinished order. Its items are listed below — pay for it, or cancel it to
+          start again with your current cart.
+        </p>
         <div className="card-surface mt-6 p-6">
           <p className="text-sm text-muted">Order {resuming.id}</p>
-          <p className="mt-2 text-lg font-bold tabular-nums">
-            {formatINR(resuming.totalPaise)}
-          </p>
+          <ul className="mt-4 divide-y divide-line">
+            {resuming.items.map((item) => (
+              <li
+                key={item.productId}
+                className="flex items-center justify-between gap-4 py-2 text-sm"
+              >
+                <span>
+                  {item.productName}
+                  <span className="block text-xs text-muted">
+                    {item.quantity} × {formatINR(item.unitPricePaise)}
+                  </span>
+                </span>
+                <span className="tabular-nums font-semibold">{formatINR(item.subtotalPaise)}</span>
+              </li>
+            ))}
+          </ul>
+          <div className="mt-3 flex items-center justify-between border-t border-line pt-3 text-base font-bold">
+            <span>Total</span>
+            <span className="tabular-nums">{formatINR(resuming.totalPaise)}</span>
+          </div>
           <p className="mt-3 text-sm text-muted">
             Payment status: {resuming.paymentStatus}. {CARE[resuming.paymentStatus] ?? ""}
           </p>
+          {error && (
+            <p className="mt-3 text-sm text-danger" role="alert">
+              {error}
+            </p>
+          )}
           <div className="mt-6">
             <PaymentButton
               orderId={resuming.id}
@@ -144,8 +175,13 @@ function CheckoutPage() {
               customerEmail={form.email}
             />
           </div>
-          <button type="button" className="btn-outline mt-6 w-full" onClick={() => void abandon()}>
-            Start a new order instead
+          <button
+            type="button"
+            className="btn-outline mt-4 w-full"
+            disabled={busy}
+            onClick={() => void cancelResume()}
+          >
+            {busy ? "Cancelling…" : "Cancel this order and start over"}
           </button>
         </div>
       </main>
@@ -260,7 +296,7 @@ function Field({
     <label className="block text-sm font-medium text-ink">
       {label}
       <span className="field mt-1">
-        <input type={type} value={value} onChange={(e) => onChange(e.target.value)} required={label !== "Address"} />
+        <input type={type} value={value} onChange={(e) => onChange(e.target.value)} required />
       </span>
     </label>
   );

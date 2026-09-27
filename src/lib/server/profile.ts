@@ -8,6 +8,8 @@ export type Profile = {
   addressLine: string | null;
   city: string | null;
   pincode: string | null;
+  /** Avatar as a data URL (client downscales before upload); null = none. */
+  photoUrl: string | null;
   role: "USER" | "ADMIN";
   createdAt: string;
 };
@@ -30,10 +32,11 @@ export async function ensureProfile(
     address_line: string | null;
     city: string | null;
     pincode: string | null;
+    photo_url: string | null;
     role: "USER" | "ADMIN";
     created_at: string;
   }>`
-    select user_id, first_name, last_name, phone, address_line, city, pincode, role,
+    select user_id, first_name, last_name, phone, address_line, city, pincode, photo_url, role,
            created_at::text as created_at
     from user_profiles where user_id = ${userId} limit 1
   `;
@@ -46,6 +49,7 @@ export async function ensureProfile(
     addressLine: row.address_line,
     city: row.city,
     pincode: row.pincode,
+    photoUrl: row.photo_url,
     role: row.role,
     createdAt: row.created_at,
   };
@@ -53,7 +57,9 @@ export async function ensureProfile(
 
 export async function updateProfile(
   userId: string,
-  patch: Partial<Pick<Profile, "firstName" | "lastName" | "phone" | "addressLine" | "city" | "pincode">>,
+  patch: Partial<
+    Pick<Profile, "firstName" | "lastName" | "phone" | "addressLine" | "city" | "pincode" | "photoUrl">
+  >,
 ) {
   const current = await ensureProfile(userId);
   const sql = await getSql();
@@ -65,6 +71,7 @@ export async function updateProfile(
       address_line = ${patch.addressLine ?? current.addressLine},
       city = ${patch.city ?? current.city},
       pincode = ${patch.pincode ?? current.pincode},
+      photo_url = ${patch.photoUrl ?? current.photoUrl},
       updated_at = now()
     where user_id = ${userId}
   `;

@@ -3,6 +3,10 @@ import { z } from "zod";
 import { getProduct, getService, listProducts, listServices } from "@/lib/server/catalog";
 import { asResult, ok, type ApiResult } from "@/lib/server/errors";
 import { requestPasswordReset, resetPasswordWithToken } from "@/lib/server/password-reset";
+import {
+  requestRegistrationOtp,
+  verifyRegistrationOtp,
+} from "@/lib/server/registration-otp";
 import type { ProductRow, ServiceRow } from "@/lib/server/catalog";
 
 const listSchema = z.object({
@@ -73,6 +77,46 @@ export const confirmReset = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<ApiResult<{ message: string }>> => {
     try {
       const result = await resetPasswordWithToken(data.token, data.password);
+      return ok(result);
+    } catch (err) {
+      return asResult(err);
+    }
+  });
+
+const registrationSchema = z.object({
+  firstName: z.string().trim().min(1).max(80),
+  lastName: z.string().trim().min(1).max(80),
+  email: z.string().trim().email().max(254),
+  password: z
+    .string()
+    .min(8, "Password must be at least 8 characters.")
+    .max(128)
+    .regex(/[a-zA-Z]/, "Password must contain a letter.")
+    .regex(/[0-9]/, "Password must contain a number."),
+});
+
+/** Step 1 of OTP registration — validate + email a 6-digit code. */
+export const requestRegistrationOtpFn = createServerFn({ method: "POST" })
+  .validator((data: unknown) => registrationSchema.parse(data))
+  .handler(async ({ data }): Promise<ApiResult<{ message: string; expiresInSeconds: number }>> => {
+    try {
+      const result = await requestRegistrationOtp(data);
+      return ok({ message: result.message, expiresInSeconds: result.expiresInSeconds });
+    } catch (err) {
+      return asResult(err);
+    }
+  });
+
+/** Step 2 of OTP registration — verify the code and CREATE the account. */
+export const verifyRegistrationOtpFn = createServerFn({ method: "POST" })
+  .validator((data: unknown) =>
+    z
+      .object({ email: z.string().trim().email(), code: z.string().trim().regex(/^\d{6}$/) })
+      .parse(data),
+  )
+  .handler(async ({ data }): Promise<ApiResult<{ message: string; userId: string }>> => {
+    try {
+      const result = await verifyRegistrationOtp(data.email, data.code);
       return ok(result);
     } catch (err) {
       return asResult(err);

@@ -109,6 +109,13 @@ export async function getOrderForUser(orderId: string, userId: string, admin = f
   return hydrate(sql, rows[0]);
 }
 
+/**
+ * The user's Orders page: **only orders whose payment succeeded** (spec
+ * request). An order that was merely created, is awaiting payment, or whose
+ * payment failed/expired is not an order the user owns yet — it is an
+ * unfinished checkout, surfaced by `pendingOrderForUser` so it can be seen
+ * (items included) and either paid or cancelled.
+ */
 export async function listOrders(userId: string) {
   const sql = await getSql();
   const rows = await sql<OrderRow>`
@@ -116,10 +123,37 @@ export async function listOrders(userId: string) {
            payment_status, order_status, active_payment_attempt_id,
            razorpay_order_id, razorpay_payment_id, invoice_number,
            customer_snapshot, created_at::text as created_at
-    from orders where user_id = ${userId}
+    from orders where user_id = ${userId} and payment_status = 'PAID'
     order by created_at desc
   `;
   return Promise.all(rows.map((r) => hydrate(sql, r)));
+}
+
+/**
+ * The user's single UNFINISHED checkout — an order that exists but is not
+ * paid (created, payment in flight, failed or expired) and was not cancelled,
+ * returned WITH its items so the cart can show what is being held and offer
+ * either completing the payment or cancelling it.
+ *
+ * Cancelled orders are excluded: they are settled business, not something the
+ * user still has to resolve.
+ */
+export async function pendingOrderForUser(userId: string): Promise<OrderRecord | null> {
+  const sql = await getSql();
+  const rows = await sql<OrderRow>`
+    select id, user_id, subtotal_paise, tax_paise, total_paise, currency,
+           payment_status, order_status, active_payment_attempt_id,
+           razorpay_order_id, razorpay_payment_id, invoice_number,
+           customer_snapshot, created_at::text as created_at
+    from orders
+    where user_id = ${userId}
+      and payment_status <> 'PAID'
+      and order_status in ('PENDING_PAYMENT', 'PAYMENT_PROCESSING')
+    order by created_at desc
+    limit 1
+  `;
+  if (!rows[0]) return null;
+  return hydrate(sql, rows[0]);
 }
 
 async function reserveStock(sql: Sql, orderId: string, productId: string, qty: number) {
@@ -163,34 +197,17 @@ export async function createOrderFromCart(
   );
   if (existing) return existing.order;
 
-  const pending = await sql<OrderRow>`
-    select id, user_id, subtotal_paise, tax_paise, total_paise, currency,
-           payment_status, order_status, active_payment_attempt_id,
-           razorpay_order_id, razorpay_payment_id, invoice_number,
-           customer_snapshot, created_at::text as created_at
-    from orders
-    where user_id = ${userId} and payment_status in ('CREATED', 'PAYMENT_INITIATED', 'PROCESSING')
-       and order_status in ('PENDING_PAYMENT', 'PAYMENT_PROCESSING')
-    order by created_at desc
-    limit 1
-  `;
-  if (pending[0] && pending[0].payment_status !== "PAID") {
-    // Reuse the pending order ONLY when the current cart matches its items —
-    // otherwise the user would pay for a cart they can no longer see.
-    const rec = await hydrate(sql, pending[0]);
-    const cartNow = await getCart(userId);
-    const sameCart =
-      cartNow.items.length === rec.items.length &&
-      [...cartNow.items]
-        .sort((a, b) => a.productId.localeCompare(b.productId))
-        .every(
-          (line, i) =>
-            line.productId === [...rec.items].sort((a, b) => a.productId.localeCompare(b.productId))[i]
-              .productId && line.quantity === rec.items[i].quantity,
-        );
-    if (sameCart) {
-      await writeIdempotent(sql, idempotencyKey, userId, "POST /api/orders", { customer }, { order: rec });
-      return rec;
+  const pendingRec = await pendingOrderForUser(userId);
+  if (pendingRec) {
+    // Reuse the unfinished checkout ONLY when the current cart still matches
+    // its items — otherwise the user would pay for a cart they can no longer
+    // see. This is a hard stop, never a silent second order: the cart page
+    // lists that order's items with Complete / Cancel actions.
+    if (sameCartLines(await getCart(userId), pendingRec)) {
+      await writeIdempotent(sql, idempotencyKey, userId, "POST /api/orders", { customer }, {
+        order: pendingRec,
+      });
+      return pendingRec;
     }
     fail(
       "You have an unfinished payment for a different cart. Complete or cancel it first.",
@@ -257,6 +274,19 @@ export async function createOrderFromCart(
   if (!created) fail("Could not create order.", 500);
   await writeIdempotent(sql, idempotencyKey, userId, "POST /api/orders", { customer }, { order: created });
   return created;
+}
+
+/**
+ * Same product lines and quantities, order-independent — used to decide
+ * whether an unfinished checkout still represents the user's current cart.
+ */
+export function sameCartLines(
+  cart: { items: { productId: string; quantity: number }[] },
+  order: { items: { productId: string; quantity: number }[] },
+): boolean {
+  if (cart.items.length !== order.items.length) return false;
+  const key = (i: { productId: string; quantity: number }) => `${i.productId}:${i.quantity}`;
+  return [...cart.items].map(key).sort().join("|") === [...order.items].map(key).sort().join("|");
 }
 
 /**

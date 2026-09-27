@@ -106,7 +106,10 @@ export function Header() {
                 collisionPadding={16}
                 className="z-50"
               >
-                <CartPanel onNavigate={() => setCartOpen(false)} />
+                <CartPanel
+                  onNavigate={() => setCartOpen(false)}
+                  onClose={() => setCartOpen(false)}
+                />
               </Popover.Content>
             </Popover.Portal>
           </Popover.Root>

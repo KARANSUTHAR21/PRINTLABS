@@ -127,6 +127,20 @@ const trustedOrigins: string[] = explicitBaseURL
 
 const databaseUrl = env("DATABASE_URL");
 
+// Direct Google Cloud OAuth — THIS app's own Google client (GOOGLE_CLIENT_*).
+// When set, the Google button goes straight to accounts.google.com and the
+// consent screen shows the app's OWN name/branding, not the broker's upstream
+// app (e.g. xAI). When unset, the client falls back to the brokered
+// `grok-google` provider (see ./providers + client.ts signIn).
+const googleClientId = env("GOOGLE_CLIENT_ID");
+const googleClientSecret = env("GOOGLE_CLIENT_SECRET");
+/**
+ * True when the app's own Google Cloud client is configured. Read by the
+ * public `/api/auth/config` endpoint so the client can pick the sign-in
+ * strategy (see `resolveProviderId` in `./client`).
+ */
+export const directGoogleConfigured = Boolean(googleClientId && googleClientSecret);
+
 // Static broker OAuth endpoints (skip OIDC discovery on every sign-in / callback).
 // Discovery would cost an extra network hop to the broker before the popup can
 // even redirect to Google/X — the live-preview popup felt stuck on the app for
@@ -197,6 +211,10 @@ export const auth = betterAuth({
       trustedProviders: [
         ...GROK_PROVIDERS.map((p) => p.providerId),
         GATE_PROVIDER_ID,
+        // The native Google provider uses Better Auth's own provider id —
+        // trusting it lets an email/password user link the same email's
+        // Google identity instead of erroring with account_not_linked.
+        ...(directGoogleConfigured ? ["google"] : []),
       ],
       // X's synthetic email is never "verified", so don't gate linking on the
       // local user's email-verified state.
@@ -212,6 +230,22 @@ export const auth = betterAuth({
 
   // Local email/password — toggled only via `./email-password` (not a plugin).
   ...(emailAndPasswordEnabled ? { emailAndPassword: { enabled: true } } : {}),
+
+  // The user's OWN Google Cloud OAuth client (see above). Requires the
+  // authorized redirect URI
+  //   {origin}/api/auth/callback/google
+  // (e.g. http://localhost:8080/api/auth/callback/google in dev) to be added
+  // in Google Cloud Console → APIs & Services → Credentials.
+  ...(directGoogleConfigured
+    ? {
+        socialProviders: {
+          google: {
+            clientId: googleClientId as string,
+            clientSecret: googleClientSecret as string,
+          },
+        },
+      }
+    : {}),
 
   // `__Host-` prefixed cookies: the browser REFUSES any same-named cookie that
   // carries a `Domain` attribute, so a sibling `*.grok.me` app cannot "toss" a

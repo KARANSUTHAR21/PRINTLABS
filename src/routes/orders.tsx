@@ -45,10 +45,15 @@ function OrdersPage() {
               params={{ orderId: order.id }}
               className="grid gap-3 border-b border-line p-5 last:border-b-0 hover:bg-canvas md:grid-cols-[1fr_auto_auto_auto] md:items-center"
             >
-              <div>
-                <p className="font-bold">{order.id}</p>
+              <div className="min-w-0">
+                <p className="truncate font-bold">
+                  {order.items.length > 0
+                    ? order.items.map((i) => i.productName).join(", ")
+                    : order.id}
+                </p>
                 <p className="mt-1 text-sm text-muted">
-                  {order.items.length} item(s) · {new Date(order.createdAt).toLocaleDateString()}
+                  {order.id} · {order.items.length} item(s) ·{" "}
+                  {new Date(order.createdAt).toLocaleDateString()}
                 </p>
               </div>
               <span

@@ -1,12 +1,16 @@
 import { env } from "@/lib/env.server";
 
 /**
- * Transactional email (spec Phase 7).
+ * Transactional email (spec Phase 7) — **Brevo**.
  *
- * **Transport:** SMTP via `nodemailer` when `MAIL_SERVER` is set; otherwise a
- * logged no-op so local dev and preview work with zero configuration. No
- * third-party SDK — nodemailer talks plain SMTP (starttls/465/587), which is
- * enough for any provider.
+ * **Transport (in order):**
+ * 1. Brevo HTTP API (`https://api.brevo.com/v3/smtp/email`) when `BREVO_API_KEY`
+ *    is set — preferred: no SMTP ports to negotiate, works everywhere the app
+ *    can make HTTPS calls.
+ * 2. Brevo SMTP relay (or any SMTP) via `nodemailer` when `MAIL_SERVER` is set
+ *    (Brevo relay: `smtp-relay.brevo.com:587`, user = your SMTP login/key,
+ *    password = your SMTP key).
+ * 3. Logged no-op so local dev and preview work with zero configuration.
  *
  * **Contract (spec §75):**
  * - Never throws into a payment/reset flow — `sendMail` swallows transport
@@ -14,7 +18,7 @@ import { env } from "@/lib/env.server";
  * - Never discloses account existence — callers decide the user-visible
  *   message (see `password-reset.ts` GENERIC reply).
  *
- * **Env:** `MAIL_SERVER` (host), `MAIL_PORT` (default 587),
+ * **Env:** `BREVO_API_KEY`, or `MAIL_SERVER` (host), `MAIL_PORT` (default 587),
  * `MAIL_SECURE` ("true" = 465 implicit TLS), `MAIL_USER`, `MAIL_PASSWORD`,
  * `MAIL_FROM` (default `PrintHub <no-reply@printhub.local>`).
  */
@@ -30,13 +34,64 @@ export type Mail = {
 };
 
 export function mailConfigured(): boolean {
-  return Boolean(env("MAIL_SERVER"));
+  return Boolean(env("BREVO_API_KEY") || env("MAIL_SERVER"));
+}
+
+/** Send via Brevo's HTTP API. Returns null when the API key is unset. */
+async function sendViaBrevoApi(mail: Mail): Promise<{ sent: boolean } | null> {
+  const apiKey = env("BREVO_API_KEY");
+  if (!apiKey) return null;
+  const from = env("MAIL_FROM") ?? "PrintHub <no-reply@printhub.local>";
+  const m = /^\s*(.*?)\s*<([^>]+)>\s*$/.exec(from);
+  const sender = m
+    ? { name: m[1] || "PrintHub", email: m[2] }
+    : { name: "PrintHub", email: from };
+  try {
+    const res = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: {
+        "api-key": apiKey,
+        "content-type": "application/json",
+        accept: "application/json",
+      },
+      body: JSON.stringify({
+        sender,
+        to: [{ email: mail.to }],
+        subject: mail.subject,
+        textContent: mail.text,
+        ...(mail.html ? { htmlContent: mail.html } : {}),
+        ...(mail.attachments?.length
+          ? {
+              attachment: mail.attachments.map((a) => ({
+                name: a.filename,
+                content: a.content.toString("base64"),
+                contentType: a.contentType,
+              })),
+            }
+          : {}),
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      console.error("[email] Brevo API %d: %s", res.status, body.slice(0, 300));
+      return { sent: false };
+    }
+    const body = (await res.json().catch(() => null)) as { messageId?: string } | null;
+    console.info("[email] sent via Brevo API to=%s id=%s", mail.to, body?.messageId ?? "-");
+    return { sent: true };
+  } catch (err) {
+    console.error("[email] Brevo API failed:", err instanceof Error ? err.message : err);
+    return { sent: false };
+  }
 }
 
 /** Send (or log) one message. Resolves even when delivery fails — see contract. */
 export async function sendMail(mail: Mail): Promise<{ sent: boolean }> {
   const host = env("MAIL_SERVER");
   if (!host) {
+    // Brevo API first; the logged no-op only when NEITHER transport is set.
+    const viaApi = await sendViaBrevoApi(mail);
+    if (viaApi) return viaApi;
     console.info(
       "[email:nop] to=%s subject=%s\n%s",
       mail.to,
@@ -55,7 +110,7 @@ export async function sendMail(mail: Mail): Promise<{ sent: boolean }> {
         ? { user: env("MAIL_USER")!, pass: env("MAIL_PASSWORD")! }
         : undefined,
     });
-    await transport.sendMail({
+    const info = await transport.sendMail({
       from: env("MAIL_FROM") ?? "PrintHub <no-reply@printhub.local>",
       to: mail.to,
       subject: mail.subject,
@@ -67,6 +122,7 @@ export async function sendMail(mail: Mail): Promise<{ sent: boolean }> {
         contentType: a.contentType,
       })),
     });
+    console.info("[email] sent via SMTP to=%s id=%s", mail.to, info.messageId ?? "-");
     return { sent: true };
   } catch (err) {
     // Delivery failures must never break the caller (payment/reset flows).
@@ -76,6 +132,26 @@ export async function sendMail(mail: Mail): Promise<{ sent: boolean }> {
 }
 
 // ── App emails ───────────────────────────────────────────────────────────────
+
+/** Registration OTP — 6-digit code, 10-minute TTL (registration_otps). */
+export function sendRegistrationOtpMail(to: string, name: string, code: string, ttlSeconds: number) {
+  const minutes = Math.round(ttlSeconds / 60);
+  return sendMail({
+    to,
+    subject: `${code} is your PrintHub verification code`,
+    text: [
+      `Hi ${name},`,
+      "",
+      `Your PrintHub verification code is: ${code}`,
+      "",
+      `It expires in ${minutes} minutes. If you didn't request it, you can safely ignore this email.`,
+    ].join("\n"),
+    html: `<p>Hi ${escapeHtml(name)},</p>
+<p>Your PrintHub verification code is:</p>
+<p style="font-size:2rem;font-weight:700;letter-spacing:0.3em;margin:1rem 0"><strong>${escapeHtml(code)}</strong></p>
+<p>It expires in ${minutes} minutes. If you didn't request it, you can safely ignore this email.</p>`,
+  });
+}
 
 /** Password reset — the link is single-use, 30-minute TTL (password_resets). */
 export function sendPasswordResetMail(to: string, resetLink: string) {

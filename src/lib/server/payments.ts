@@ -141,6 +141,18 @@ export async function finalizePaid(input: {
 
   const paid = await getOrderForUser(order.id, order.userId, true);
   if (!paid) fail("Order missing after payment.", 500);
+
+  // The purchased lines leave the cart. A payment completed from the checkout
+  // RESUME path (or from a webhook) never runs the `emptyCart` step, so without
+  // this the same items would sit in the cart ready to be ordered a second
+  // time. Only the lines THIS order contained are removed — anything the user
+  // added afterwards stays.
+  for (const item of paid.items) {
+    await sql`
+      delete from cart_items where user_id = ${order.userId} and product_id = ${item.productId}
+    `;
+  }
+
   const invoice = await ensureInvoice(paid, input.razorpayPaymentId);
   await audit(sql, {
     eventType: "payment_verified",

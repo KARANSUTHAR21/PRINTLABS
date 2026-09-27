@@ -12,7 +12,15 @@ import {
 } from "@/lib/server/cart";
 import { asResult, fail, ok, type ApiResult } from "@/lib/server/errors";
 import { getInvoiceForOrder, type InvoiceRecord } from "@/lib/server/invoices";
-import { createOrderFromCart, cancelOrder, getOrderForUser, listOrders, type OrderRecord } from "@/lib/server/orders";
+import {
+  cancelOrder,
+  createOrderFromCart,
+  getOrderForUser,
+  listOrders,
+  pendingOrderForUser,
+  sameCartLines,
+  type OrderRecord,
+} from "@/lib/server/orders";
 import {
   createPaymentSession,
   failPayment,
@@ -119,9 +127,10 @@ export const placeOrder = createServerFn({ method: "POST" })
           lastName: z.string().optional(),
           email: z.string().optional(),
           phone: z.string().optional(),
-          addressLine: z.string().optional(),
-          city: z.string().optional(),
-          pincode: z.string().optional(),
+          // Delivery address is compulsory for payment (spec request).
+          addressLine: z.string().trim().min(1, "Address is required."),
+          city: z.string().trim().min(1, "City is required."),
+          pincode: z.string().trim().min(1, "PIN code is required."),
         }),
       })
       .parse(data),
@@ -148,6 +157,30 @@ export const loadOrders = createServerFn({ method: "GET" })
       return asResult(err);
     }
   });
+
+/**
+ * The user's UNFINISHED checkout — an unpaid, non-cancelled order returned
+ * with its items. The cart page uses it to show exactly what is being held
+ * and to offer completing or cancelling it (spec request).
+ */
+export const loadPendingOrder = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
+  .handler(
+    async ({
+      context,
+    }): Promise<ApiResult<{ order: OrderRecord | null; matchesCart: boolean }>> => {
+      try {
+        const order = await pendingOrderForUser(context.userId);
+        // Whether the unfinished checkout still IS the current cart — decided
+        // on the server (one definition of "same cart", shared with
+        // `createOrderFromCart`) so the checkout never has to guess.
+        const matchesCart = order ? sameCartLines(await getCart(context.userId), order) : false;
+        return ok({ order, matchesCart });
+      } catch (err) {
+        return asResult(err);
+      }
+    },
+  );
 
 export const loadOrder = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
@@ -302,6 +335,14 @@ export const saveProfile = createServerFn({ method: "POST" })
         addressLine: z.string().max(160).optional(),
         city: z.string().max(80).optional(),
         pincode: z.string().max(12).optional(),
+        // Avatar as a downscaled data URL (the client resizes to ≤256px JPEG
+        // before upload so this stays far below any request limits).
+        photoUrl: z
+          .string()
+          .max(200_000)
+          .regex(/^data:image\/(png|jpeg);base64,/, "Unsupported image format.")
+          .nullable()
+          .optional(),
       })
       .parse(data),
   )

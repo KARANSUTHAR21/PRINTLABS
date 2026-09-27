@@ -7,7 +7,6 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { toast } from "sonner";
 import { useNavigate } from "@tanstack/react-router";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import {
@@ -50,7 +49,7 @@ type CartCtx = {
 function useRequireAuth() {
   const navigate = useNavigate();
   return useCallback(() => {
-    toast.error("Please sign in to add items to your cart.");
+    // Silent redirect — no toast (spec: no cart messages).
     const here =
       typeof window !== "undefined"
         ? window.location.pathname + window.location.search
@@ -110,12 +109,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
         return false;
       }
       const res = await addToCart({ data: { productId, quantity } });
-      if (!res.success) {
-        toast.error(res.message);
-        return false;
-      }
+      if (!res.success) return false;
       setCart(res.cart);
-      toast.success("Added to cart");
       return true;
     },
     [requireAuth, user],
@@ -128,10 +123,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         return;
       }
       const res = await updateCartItem({ data: { productId, quantity } });
-      if (!res.success) {
-        toast.error(res.message);
-        return;
-      }
+      if (!res.success) return;
       setCart(res.cart);
     },
     [requireAuth, user],

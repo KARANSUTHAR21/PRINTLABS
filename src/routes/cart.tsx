@@ -1,7 +1,11 @@
+import { useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Minus, Plus, Trash2 } from "lucide-react";
 import { useCart } from "@/components/cart/cart-provider";
+import { cancelPendingOrder, loadPendingOrder } from "@/lib/api/commerce";
+import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { formatINR } from "@/lib/money";
+import type { OrderRecord } from "@/lib/server/orders";
 
 export const Route = createFileRoute("/cart")({ component: CartPage });
 
@@ -10,6 +14,13 @@ function CartPage() {
   return (
     <main className="container-page py-12">
       <h1 className="text-3xl font-extrabold">Your Bill</h1>
+      {/*
+        An order can exist without a successful payment (created, payment in
+        flight, failed or expired). Those are NOT orders in the Orders list —
+        they are an unfinished cart, and the user must be able to SEE what is
+        held and CANCEL it instead of hitting a dead end at checkout.
+      */}
+      <UnfinishedOrder />
       {loading ? (
         <p className="mt-6 text-sm text-muted">Loading cart…</p>
       ) : cart.items.length === 0 ? (
@@ -88,5 +99,110 @@ function CartPage() {
         </div>
       )}
     </main>
+  );
+}
+
+const PENDING_NOTE: Record<string, string> = {
+  CREATED: "Payment was never completed.",
+  PAYMENT_INITIATED: "Payment was started but not completed.",
+  PROCESSING: "A payment is still being processed.",
+  FAILED: "The last payment attempt failed.",
+  EXPIRED: "The last payment session expired.",
+};
+
+/** The user's unfinished checkout, with its items and a way out of it. */
+function UnfinishedOrder() {
+  const { user, isPending } = useCurrentUserState();
+  const { refresh } = useCart();
+  const [order, setOrder] = useState<OrderRecord | null>(null);
+  const [cancelling, setCancelling] = useState(false);
+  const [notice, setNotice] = useState("");
+
+  useEffect(() => {
+    if (isPending || !user) {
+      setOrder(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const res = await loadPendingOrder();
+      if (!cancelled) setOrder(res.success ? res.order : null);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isPending, user]);
+
+  async function cancel(orderId: string) {
+    setCancelling(true);
+    const res = await cancelPendingOrder({ data: { orderId } });
+    setCancelling(false);
+    if (!res.success) {
+      setNotice(res.message);
+      return;
+    }
+    setNotice(`Order ${orderId} cancelled — the items are no longer held.`);
+    setOrder(null);
+    await refresh();
+  }
+
+  return (
+    <>
+      {notice && (
+        <p className="mt-6 text-sm text-muted" role="status">
+          {notice}
+        </p>
+      )}
+      {isPending || !user || !order ? null : (
+        <section className="card-surface mt-8 border-primary/40 p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="font-bold">Unfinished order</h2>
+              <p className="mt-1 text-sm text-muted">
+                {PENDING_NOTE[order.paymentStatus] ?? "This order is awaiting payment."} These items
+                are still held for you — complete the payment or cancel the order.
+              </p>
+            </div>
+            <span className="rounded-full bg-mist px-3 py-1 text-xs font-bold text-muted">
+              {order.paymentStatus.replace(/_/g, " ")}
+            </span>
+          </div>
+          <ul className="mt-4 divide-y divide-line">
+            {order.items.map((item) => (
+              <li
+                key={item.productId}
+                className="flex items-center justify-between gap-4 py-2 text-sm"
+              >
+                <span>
+                  {item.productName}
+                  <span className="block text-xs text-muted">
+                    {item.quantity} × {formatINR(item.unitPricePaise)}
+                  </span>
+                </span>
+                <span className="tabular-nums font-semibold">{formatINR(item.subtotalPaise)}</span>
+              </li>
+            ))}
+          </ul>
+          <div className="mt-3 flex items-center justify-between border-t border-line pt-3 text-sm font-bold">
+            <span>Total</span>
+            <span className="tabular-nums">{formatINR(order.totalPaise)}</span>
+          </div>
+          <p className="mt-3 text-xs text-muted">Order {order.id}</p>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <Link to="/checkout" className="btn-navy">
+              Complete payment
+            </Link>
+            <button
+              type="button"
+              className="btn-outline"
+              disabled={cancelling}
+              onClick={() => void cancel(order.id)}
+            >
+              {cancelling ? "Cancelling…" : "Cancel this order"}
+            </button>
+          </div>
+        </section>
+      )}
+    </>
   );
 }

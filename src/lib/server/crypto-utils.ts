@@ -40,6 +40,14 @@ export function randomToken(bytes = 32): string {
   return randomBytes(bytes).toString("hex");
 }
 
+/**
+ * A 6-digit numeric OTP as a string (leading zeros preserved) — crypto-random,
+ * not Math.random, so consecutive codes are not predictable.
+ */
+export function randomOTP(): string {
+  return (randomBytes(4).readUInt32BE(0) % 1_000_000).toString().padStart(6, "0");
+}
+
 export function hashIdempotency(endpoint: string, body: unknown): string {
   return sha256(`${endpoint}:${JSON.stringify(body)}`);
 }

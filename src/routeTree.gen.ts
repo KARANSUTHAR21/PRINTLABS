@@ -31,6 +31,7 @@ import { Route as ResetPasswordTokenRouteImport } from './routes/reset-password.
 import { Route as ServicesIndexRouteImport } from './routes/services.index'
 import { Route as ServicesSlugRouteImport } from './routes/services.$slug'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
+import { Route as ApiAuthConfigRouteImport } from './routes/api/auth.config'
 import { Route as ApiPaymentsWebhookRouteImport } from './routes/api/payments.webhook'
 import { Route as ApiInvoicesOrderIdPdfRouteImport } from './routes/api/invoices.$orderId.pdf'
 
@@ -144,6 +145,11 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAuthConfigRoute = ApiAuthConfigRouteImport.update({
+  id: '/api/auth/config',
+  path: '/api/auth/config',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPaymentsWebhookRoute = ApiPaymentsWebhookRouteImport.update({
   id: '/api/payments/webhook',
   path: '/api/payments/webhook',
@@ -178,6 +184,7 @@ export interface FileRoutesByFullPath {
   '/products/': typeof ProductsIndexRoute
   '/services/': typeof ServicesIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/auth/config': typeof ApiAuthConfigRoute
   '/api/payments/webhook': typeof ApiPaymentsWebhookRoute
   '/api/invoices/$orderId/pdf': typeof ApiInvoicesOrderIdPdfRoute
 }
@@ -202,6 +209,7 @@ export interface FileRoutesByTo {
   '/products': typeof ProductsIndexRoute
   '/services': typeof ServicesIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/auth/config': typeof ApiAuthConfigRoute
   '/api/payments/webhook': typeof ApiPaymentsWebhookRoute
   '/api/invoices/$orderId/pdf': typeof ApiInvoicesOrderIdPdfRoute
 }
@@ -229,6 +237,7 @@ export interface FileRoutesById {
   '/products/': typeof ProductsIndexRoute
   '/services/': typeof ServicesIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/auth/config': typeof ApiAuthConfigRoute
   '/api/payments/webhook': typeof ApiPaymentsWebhookRoute
   '/api/invoices/$orderId/pdf': typeof ApiInvoicesOrderIdPdfRoute
 }
@@ -257,6 +266,7 @@ export interface FileRouteTypes {
     | '/products/'
     | '/services/'
     | '/api/auth/$'
+    | '/api/auth/config'
     | '/api/payments/webhook'
     | '/api/invoices/$orderId/pdf'
   fileRoutesByTo: FileRoutesByTo
@@ -281,6 +291,7 @@ export interface FileRouteTypes {
     | '/products'
     | '/services'
     | '/api/auth/$'
+    | '/api/auth/config'
     | '/api/payments/webhook'
     | '/api/invoices/$orderId/pdf'
   id:
@@ -307,6 +318,7 @@ export interface FileRouteTypes {
     | '/products/'
     | '/services/'
     | '/api/auth/$'
+    | '/api/auth/config'
     | '/api/payments/webhook'
     | '/api/invoices/$orderId/pdf'
   fileRoutesById: FileRoutesById
@@ -329,6 +341,7 @@ export interface RootRouteChildren {
   OrderSuccessOrderIdRoute: typeof OrderSuccessOrderIdRoute
   ResetPasswordTokenRoute: typeof ResetPasswordTokenRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
+  ApiAuthConfigRoute: typeof ApiAuthConfigRoute
   ApiPaymentsWebhookRoute: typeof ApiPaymentsWebhookRoute
   ApiInvoicesOrderIdPdfRoute: typeof ApiInvoicesOrderIdPdfRoute
 }
@@ -489,6 +502,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/auth/config': {
+      id: '/api/auth/config'
+      path: '/api/auth/config'
+      fullPath: '/api/auth/config'
+      preLoaderRoute: typeof ApiAuthConfigRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/payments/webhook': {
       id: '/api/payments/webhook'
       path: '/api/payments/webhook'
@@ -563,6 +583,7 @@ const rootRouteChildren: RootRouteChildren = {
   OrderSuccessOrderIdRoute: OrderSuccessOrderIdRoute,
   ResetPasswordTokenRoute: ResetPasswordTokenRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
+  ApiAuthConfigRoute: ApiAuthConfigRoute,
   ApiPaymentsWebhookRoute: ApiPaymentsWebhookRoute,
   ApiInvoicesOrderIdPdfRoute: ApiInvoicesOrderIdPdfRoute,
 }

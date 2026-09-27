@@ -2,8 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 /**
- * Email service contract (spec Phase 7):
- *  - no MAIL_SERVER → logged no-op that RESOLVES (never throws into flows);
+ * Email service contract (spec Phase 7 — Brevo transport):
+ *  - no BREVO_API_KEY and no MAIL_SERVER → logged no-op that RESOLVES
+ *    (never throws into flows);
  *  - HTML escaping keeps customer names from injecting markup;
  *  - transport failures are swallowed and reported as `{ sent: false }`.
  */
@@ -12,6 +13,7 @@ const email = await import("../src/lib/server/email.ts");
 
 // Ensure the no-op path is taken regardless of the developer's real .env.
 process.env.MAIL_SERVER = "";
+process.env.BREVO_API_KEY = "";
 
 test("sendMail resolves with sent:false when mail is not configured (no throw)", async () => {
   const result = await email.sendMail({ to: "a@b.c", subject: "s", text: "body" });

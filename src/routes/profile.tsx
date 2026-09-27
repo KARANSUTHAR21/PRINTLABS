@@ -28,6 +28,34 @@ function ProfilePage() {
     });
   }, []);
 
+  /** Downscale to ≤256px JPEG so the data URL stays small; drop alpha via JPEG. */
+  async function onPhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-picking the same file
+    if (!profile || !file) return;
+    if (!/^image\/(png|jpeg)$/.test(file.type)) {
+      setMessage("Please choose a PNG or JPG image.");
+      return;
+    }
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const size = 256;
+        const scale = Math.min(1, size / Math.max(img.width, img.height));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return reject(new Error("Canvas unavailable"));
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL("image/jpeg", 0.85));
+      };
+      img.onerror = () => reject(new Error("Could not read that image."));
+      img.src = URL.createObjectURL(file);
+    }).catch(() => null);
+    if (dataUrl) setProfile({ ...profile, photoUrl: dataUrl });
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!profile) return;
@@ -47,6 +75,40 @@ function ProfilePage() {
         Email: <span className="font-semibold text-ink">{user?.primaryEmail ?? profile.userId}</span>
         {" · "}Member since {new Date(profile.createdAt).toLocaleDateString("en-IN")}
       </p>
+      <div className="mt-6 flex items-center gap-5">
+        {profile.photoUrl ? (
+          <img
+            src={profile.photoUrl}
+            alt="Profile photo"
+            className="size-20 rounded-full border border-line object-cover"
+          />
+        ) : (
+          <span className="grid size-20 place-items-center rounded-full border border-line bg-canvas text-2xl font-bold text-muted">
+            {(profile.firstName || user?.primaryEmail || "P").charAt(0).toUpperCase()}
+          </span>
+        )}
+        <div>
+          <label className="btn-outline cursor-pointer">
+            {profile.photoUrl ? "Change photo" : "Add profile photo"}
+            <input
+              type="file"
+              accept="image/png,image/jpeg"
+              className="hidden"
+              onChange={(e) => void onPhotoChange(e)}
+            />
+          </label>
+          {profile.photoUrl && (
+            <button
+              type="button"
+              className="mt-2 block text-sm text-muted underline"
+              onClick={() => setProfile({ ...profile, photoUrl: null })}
+            >
+              Remove photo
+            </button>
+          )}
+          <p className="mt-1 text-xs text-muted">PNG or JPG, auto-resized to 256px. Save to apply.</p>
+        </div>
+      </div>
       <form className="mt-8 grid gap-4 sm:grid-cols-2" onSubmit={(e) => void submit(e)}>
         <Field label="First name" value={profile.firstName} onChange={(firstName) => setProfile({ ...profile, firstName })} />
         <Field label="Last name" value={profile.lastName} onChange={(lastName) => setProfile({ ...profile, lastName })} />

@@ -40,6 +40,56 @@ export const authEnabled = import.meta.env.VITE_AUTH_ENABLED !== "false";
 /** The upstream providers to render sign-in buttons for. */
 export { GROK_PROVIDERS };
 
+/**
+ * Google sign-in strategy — set by the server and read by `signIn`.
+ *
+ * `direct`   : the app's OWN Google Cloud client (`GOOGLE_CLIENT_*` in `.env`)
+ *              is configured server-side, so Google shows OUR consent screen
+ *              (not the broker's upstream app, e.g. xAI).
+ * `brokered` : fall back to the shared broker client (`grok-google`).
+ *
+ * The server exposes the flag via the public `/api/auth/ok` endpoint so the
+ * client never needs to know whether the keys are configured.
+ */
+export type GoogleStrategy = "direct" | "brokered";
+let googleStrategy: GoogleStrategy = "brokered";
+
+/**
+ * Memoized strategy fetch. `signIn` awaits this for Google so a fast click can
+ * never race the bootstrap and silently fall back to the brokered flow.
+ * Resolves once; a failed fetch keeps the safe "brokered" default.
+ */
+let strategyReady: Promise<GoogleStrategy> | null = null;
+function ensureGoogleStrategy(): Promise<GoogleStrategy> {
+  strategyReady ??= fetch("/api/auth/config")
+    .then((r) => (r.ok ? r.json() : null))
+    .then((cfg: { googleStrategy?: GoogleStrategy } | null) => {
+      if (cfg?.googleStrategy === "direct" || cfg?.googleStrategy === "brokered") {
+        googleStrategy = cfg.googleStrategy;
+      }
+      return googleStrategy;
+    })
+    .catch(() => googleStrategy);
+  return strategyReady;
+}
+
+/** Called by the auth provider bootstrap (see `use-current-user`). */
+export function setGoogleStrategy(s: GoogleStrategy): void {
+  googleStrategy = s;
+}
+
+/** Resolves a provider id to the concrete sign-in route. */
+export function resolveProviderId(providerId: string): string {
+  if (providerId === "grok-google" && googleStrategy === "direct") return "google";
+  return providerId;
+}
+
+// Warm the strategy on page load (browser only) so the flag is usually ready
+// before the first click; `signIn` still awaits it as a guarantee.
+if (typeof window !== "undefined") {
+  void ensureGoogleStrategy();
+}
+
 // ── Live-preview bearer token ────────────────────────────────────────────────
 // The embedded preview iframe has partitioned cookies, so we keep the session's
 // bearer token in sessionStorage and attach it to every Better Auth request (and
@@ -155,8 +205,29 @@ export async function signIn(
     return;
   }
 
+  // Direct Google — THIS app's own Google Cloud client (`GOOGLE_CLIENT_*`),
+  // so the consent screen shows this app instead of the broker's upstream
+  // (e.g. xAI). Uses Better Auth's native social flow, NOT the broker. Skipped
+  // inside the live-preview iframe: sandbox origins are not in the Google
+  // client's authorized redirect URIs, so the brokered popup still serves there.
+  if (providerId === "grok-google" && !inLivePreview()) {
+    // Await the strategy — a fast click must never race the config fetch and
+    // silently launch the brokered (xAi) OAuth app.
+    const strategy = await ensureGoogleStrategy();
+    if (strategy === "direct") {
+      const { data, error } = await authClient.signIn.social({
+        provider: "google",
+        callbackURL,
+        errorCallbackURL,
+      });
+      if (error) throw new Error(error.message ?? "Sign-in failed");
+      if (data?.url) window.location.href = data.url;
+      return;
+    }
+  }
+
   const { data, error } = await authClient.signIn.oauth2({
-    providerId,
+    providerId: resolveProviderId(providerId),
     callbackURL,
     errorCallbackURL,
   });

@@ -136,7 +136,17 @@ function createNeonSql(): Promise<Sql> {
     types.setTypeParser(OID_INT8, Number);
     types.setTypeParser(OID_DATE, identity);
     types.setTypeParser(OID_INTERVAL, identity);
-    const pool = new Pool({ connectionString: databaseUrl });
+    // Managed Postgres (Neon, Supabase pooler, …) terminates TLS: node-postgres
+    // does NOT enable SSL for plain `postgresql://` URLs, so force it for any
+    // non-local host (opt out with `?sslmode=disable` in the URL).
+    const forceSsl =
+      databaseUrl &&
+      !/sslmode=disable/.test(databaseUrl) &&
+      !/(localhost|127\.0\.0\.1|::1)/.test(databaseUrl);
+    const pool = new Pool({
+      connectionString: databaseUrl,
+      ...(forceSsl ? { ssl: { rejectUnauthorized: false } } : {}),
+    });
     globalRef.__pgPool__ = pool; // shared with getLockPool()
     return toSql(async <T>(text: string, params: unknown[]) => {
       const res = await pool.query(text, params);
@@ -156,6 +166,10 @@ async function createPgliteSql(): Promise<Sql> {
   globalRef.__pgliteInstance__ ??= (async () => {
     const { PGlite } = await import("@electric-sql/pglite");
     const pg = new PGlite({
+      // In-memory by default — a fresh database on every process start (fast,
+      // and stale dev data can never leak between sessions). Set
+      // `PGLITE_DATA_DIR` (e.g. `.pglite-data`) to persist across restarts.
+      dataDir: process.env.PGLITE_DATA_DIR?.trim() || undefined,
       parsers: {
         [OID_INT8]: Number,
         [OID_DATE]: identity,
@@ -263,13 +277,24 @@ export async function getPglite(): Promise<import("@electric-sql/pglite").PGlite
  */
 export function ensureDbReady(): Promise<void> {
   if (dbSource !== "pglite") return Promise.resolve();
-  return getSql().then(() => undefined);
+  // One seed pass per process (globalThis memo — HMR re-evals share it), run
+  // after migrations, before the server accepts traffic. The seed re-creates
+  // the documented test login that in-memory resets wipe (see dev-seed.ts);
+  // failures are logged and swallowed so boot is never blocked by it.
+  globalBoot.__pgSeedPromise__ ??= getSql()
+    .then(() => import("./server/dev-seed"))
+    .then((m) => m.seedDevAccounts())
+    .catch((err) => {
+      console.warn("[db] dev seed skipped:", err instanceof Error ? err.message : err);
+    });
+  return globalBoot.__pgSeedPromise__.then(() => undefined);
 }
 
 // Server-only eager start: kick PGLite bootstrap as soon as this module loads in
 // Node. Client bundles never hit this path (`getSql` throws in the browser).
 const globalBoot = globalThis as typeof globalThis & {
   __pgBootstrapPromise__?: Promise<void>;
+  __pgSeedPromise__?: Promise<void>;
 };
 if (typeof window === "undefined" && dbSource === "pglite") {
   globalBoot.__pgBootstrapPromise__ ??= ensureDbReady().catch((err) => {

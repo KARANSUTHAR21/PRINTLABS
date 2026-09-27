@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 # PrintHub
 
 A production-structured e-commerce application for a neighbourhood
@@ -83,7 +83,7 @@ src/
       invoices.ts        One-invoice-per-payment + PDF builder
       machine.ts         Payment & order state machines
       idempotency.ts     Idempotency-key ledger
-      locks.ts           In-process mutex (single-node; see below)
+      locks.ts           Postgres advisory locks (Neon) / in-process mutex (local)
       provider.ts        Razorpay client + sandbox fallback + HMAC
       cache.ts           TTL cache with graceful failure
       rate-limit.ts      Fixed-window rate limiter
@@ -170,14 +170,15 @@ in the UI — accounts are real rows in the `user` table.
 
 | Variable | Purpose |
 |----------|---------|
-| `DATABASE_URL` | Postgres/Neon connection string; omit for local PGLite |
+| `DATABASE_URL` | Postgres connection string (Supabase/Neon); omit for local PGLite. On Supabase use the **session pooler** URI (port 5432) — the transaction pooler cannot serve session-level advisory locks |
 | `BETTER_AUTH_SECRET` | Auth signing secret (auto-generated per-process in dev) |
 | `BETTER_AUTH_URL` | Public origin when deployed |
 | `VITE_AUTH_ENABLED` | `false` disables auth entirely (dev convenience) |
 | `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` | Live/test Razorpay keys; omit to use the built-in sandbox provider |
 | `RAZORPAY_WEBHOOK_SECRET` | Secret for webhook signature verification |
 | `FRONTEND_URL` | Absolute base URL used in password-reset emails |
-| `MAIL_*` | SMTP settings for transactional email (logging fallback) |
+| `BREVO_API_KEY` | Brevo API v3 key — preferred mail transport (falls back to `MAIL_*`, then a logged no-op) |
+| `MAIL_*` | SMTP relay settings for transactional email (Brevo relay, or any SMTP) |
 
 ### Testing
 
@@ -185,6 +186,15 @@ in the UI — accounts are real rows in the `user` table.
 npm test               # all unit/integration tests (node:test)
 npm run typecheck      # TypeScript
 npm run check:auth     # auth invariant checks
+
+# Live checks against the configured services (not part of `npm test`)
+npm run verify:otp        # registration OTP: crypto-random codes, hashed at rest,
+                          # dummies rejected, single-use, resend invalidation,
+                          # and the 10-minute window (valid before, dead after)
+npm run verify:mail       # SMTP relay accepts credentials and OTP mail is DELIVERED
+                          # (sends real email to at most 2 receivers; -- --check is
+                          #  a no-send transport preflight)
+npm run verify:razorpay   # Razorpay keys authenticate against the real provider
 ```
 
 Test coverage includes the payment state machine (legal/illegal
@@ -217,13 +227,15 @@ With Razorpay test keys, additionally exercise:
 ### Concurrency
 
 - **Order/payment creation**: idempotency keys + unique active-attempt
-  index + an in-process lock around payment session creation.
+  index + a distributed lock around payment-session creation (Postgres
+  session-level advisory locks on Neon, in-process mutex on local PGLite).
 - **Verification/webhook race**: finalize is guarded by "only transition
   if not already PAID" + unique `razorpay_payment_id`; whichever arrives
   second becomes a no-op, and invoice creation dedupes by order.
-- **Multi-instance deployments**: swap `locks.ts` for a Redis/Postgres
-  advisory-lock implementation; the DB constraints already guarantee
-  correctness — the lock only reduces contention.
+- **Multi-instance deployments**: already safe — locks are Postgres
+  session-level advisory locks on Neon (per-process mutex on local PGLite)
+  and rate limits share the `rate_limit_counters` table; DB constraints
+  remain the final correctness guarantee.
 
 ## Production deployment notes
 
@@ -236,6 +248,5 @@ With Razorpay test keys, additionally exercise:
   `reconcileStaleAttempts` from a cron) for browser-close recovery even
   when no client is polling.
 - Never commit secrets; all credentials are environment-injected.
-=======
-# PRINTLABS
->>>>>>> origin/main
+
+

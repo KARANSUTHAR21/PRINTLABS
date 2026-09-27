@@ -43,13 +43,13 @@ function Home() {
           { icon: "store", label: "Wide Range of Stationery" },
         ]}
       >
-        {/* Reference: the shortcut cards float over the photo's bottom edge. */}
-        <div className="lg:absolute lg:inset-x-0 lg:bottom-[2.875rem] lg:z-10">
-          <div className="pointer-events-none hidden flex-col items-center gap-2 pb-[1.15rem] lg:flex">
+        {/* Reference: the shortcut cards END the hero — no photo strip below. */}
+        <div className="lg:absolute lg:inset-x-0 lg:bottom-0 lg:z-10">
+          <div className="pointer-events-none hidden flex-col items-center gap-2 pb-6 lg:flex">
             <ArrowDown className="size-4 text-ink/70" />
             <p className="text-[0.95rem] text-ink/70">Explore Our Services</p>
           </div>
-          <div className="container-rail grid gap-5 pb-12 sm:grid-cols-2 lg:grid-cols-4 lg:pb-0">
+          <div className="container-rail grid gap-5 pb-12 sm:grid-cols-2 lg:grid-cols-4 lg:pb-[1.25rem]">
             {shortcuts.map((s) => (
               <ServiceShortcut key={s.id} service={s} />
             ))}

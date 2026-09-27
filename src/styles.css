@@ -241,6 +241,11 @@
     aspect-ratio: 4 / 3;
   }
 
+  /* Service cards use a taller 3:2 media block in the reference. */
+  .card-media-service {
+    aspect-ratio: 3 / 2;
+  }
+
   /* Light gray feature band with vertical separators. */
   .band {
     border-radius: var(--radius-lg);

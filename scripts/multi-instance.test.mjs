@@ -3,7 +3,9 @@ import test from "node:test";
 
 /**
  * Multi-instance readiness (spec Phase 8):
- *  - lock ids are DETERMINISTIC (two instances must derive the same number);
+ *  - lock ids are DETERMINISTIC (two instances must derive the same number)
+ *    AND inside signed int64 — `pg_try_advisory_lock(bigint)` rejects anything
+ *    larger, which broke every payment on the Postgres path;
  *  - `getLockPool` is null on the PGLite fallback (no pool to borrow);
  *  - the shared rate limiter counts every parallel caller against ONE budget.
  */
@@ -11,6 +13,30 @@ import test from "node:test";
 const locks = await import("../src/lib/server/locks.ts");
 const db = await import("../src/lib/db.ts");
 const { rateLimit, clientKey, rateLimitSync } = await import("../src/lib/server/rate-limit.ts");
+
+test("advisory lock ids are deterministic and fit in a SIGNED int64", () => {
+  const keys = [
+    "payment_lock:PH-MUJTXW5V-5B5ECB298E",
+    "payment_lock:PH-ABC",
+    "other:key",
+    ...Array.from({ length: 200 }, (_, i) => `payment_lock:PH-BULK-${i}`),
+  ];
+  const seen = new Set();
+  for (const key of keys) {
+    const id = locks.lockId(key);
+    // Deterministic across instances — the same key must always map to the
+    // same number, or two app instances would lock different keys.
+    assert.equal(locks.lockId(key), id);
+    assert.match(id, /^\d+$/, `${key} → ${id}`);
+    const value = BigInt(id);
+    assert.ok(value >= 0n, `${key} → ${id} must not use the sign bit`);
+    assert.ok(value <= 9223372036854775807n, `${key} → ${id} exceeds int64`);
+    seen.add(id);
+  }
+  // Distinct keys must (practically) never collide — one collision would
+  // serialize two unrelated payments, many would wedge the app.
+  assert.equal(seen.size, keys.length, `${keys.length - seen.size} lock id collision(s)`);
+});
 
 test("advisory lock ids are deterministic and namespaced", async () => {
   // Two derivations of the same key must be equal (cross-instance contract);

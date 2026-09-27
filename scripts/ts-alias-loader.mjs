@@ -29,7 +29,11 @@ export async function resolve(specifier, context, nextResolve) {
     candidates.push(target, `${target}.ts`, `${target}.tsx`, path.join(target, "index.ts"));
   } else if (
     (specifier.startsWith("./") || specifier.startsWith("../")) &&
-    !path.extname(specifier) &&
+    // `path.extname()` cannot be used here: dotted module names such as
+    // `./gate-session.server` report ".server" as their extension, which would
+    // skip exactly the `*.server.ts` modules this hook exists to resolve. Only a
+    // real module extension means "already resolved".
+    !/\.(ts|tsx|js|mjs|cjs|json)$/.test(specifier) &&
     context.parentURL?.startsWith("file://")
   ) {
     // Extensionless relative import inside the TS sources — try TS candidates.

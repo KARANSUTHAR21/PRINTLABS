@@ -16,18 +16,28 @@ import { dbSource, getLockPool } from "@/lib/db";
  * wins. The lock only prevents duplicate provider-order calls racing.
  */
 
-/** 64-bit signed key space; the namespace tag isolates app locks from others. */
-const LOCK_NAMESPACE = 0x70680001; // 'PH' + version tag
+/** Namespace tag — isolates this app's locks from other clients' locks. */
+const LOCK_NAMESPACE = "printhub:lock:v1:";
 
-/** Deterministic 64-bit key — every instance must derive the SAME number. */
-function lockId(key: string): string {
+/**
+ * Deterministic 64-bit key — every instance must derive the SAME number.
+ *
+ * `pg_try_advisory_lock` takes a **signed** bigint, so the FNV-1a hash is
+ * masked to its low 63 bits (max 9.22e18). The previous form
+ * (`0x70680001 << 40` ≈ 2.07e21) overflowed that range, so Postgres rejected
+ * every call with `value "2073529328098221653411" is out of range for type
+ * bigint` — which surfaced as a hard payment failure on the Postgres path
+ * (PGLite uses the in-process mutex and never noticed).
+ */
+export function lockId(key: string): string {
+  const input = `${LOCK_NAMESPACE}${key}`;
   let h = 0xcbf29ce484222325n;
   const prime = 0x100000001b3n;
-  for (let i = 0; i < key.length; i += 1) {
-    h ^= BigInt(key.charCodeAt(i));
+  for (let i = 0; i < input.length; i += 1) {
+    h ^= BigInt(input.charCodeAt(i));
     h = (h * prime) & 0xffffffffffffffffn;
   }
-  return ((BigInt(LOCK_NAMESPACE) << 40n) | (h & 0xffffffffffn)).toString();
+  return (h & 0x7fffffffffffffffn).toString();
 }
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
