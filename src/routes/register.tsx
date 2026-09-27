@@ -10,6 +10,7 @@ import {
   verifyRegistrationOtpFn,
 } from "@/lib/api/public";
 import { saveSignupProfile } from "@/lib/api/commerce";
+import { PASSWORD_HINT, passwordProblem } from "@/lib/password";
 import { safeNextPath } from "@/lib/utils";
 
 export const Route = createFileRoute("/register")({
@@ -44,6 +45,8 @@ function RegisterRoute() {
 
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  /** The code matched and the account exists — we are establishing the session. */
+  const [verified, setVerified] = useState(false);
 
   const otp = useMemo(() => digits.join(""), [digits]);
 
@@ -63,8 +66,9 @@ function RegisterRoute() {
       setError("Please enter your first and last name.");
       return;
     }
-    if (password.length < 8 || !/[a-zA-Z]/.test(password) || !/[0-9]/.test(password)) {
-      setError("Password must be at least 8 characters with letters and numbers.");
+    const problem = passwordProblem(password);
+    if (problem) {
+      setError(problem);
       return;
     }
     if (password !== confirm) {
@@ -98,16 +102,35 @@ function RegisterRoute() {
       const res = await verifyRegistrationOtpFn({ data: { email: email.trim(), code } });
       if (!res.success) throw new Error(res.message);
 
-      // Account created — sign in to establish the session, then continue.
-      const login = await authClient.signIn.email({ email: email.trim(), password });
-      if (login.error) throw new Error(login.error.message ?? "Account created — please sign in.");
-      storeSessionToken(login.data?.token);
+      // The code matched: the account now exists and can log in. Establish the
+      // session straight away so a verified user is never left at the form.
+      setVerified(true);
+      let sessionError = false;
+      try {
+        const login = await authClient.signIn.email({ email: email.trim(), password });
+        if (login.error) sessionError = true;
+        else storeSessionToken(login.data?.token);
+      } catch {
+        sessionError = true;
+      }
+      if (sessionError) {
+        // Verified, but the automatic sign-in did not stick (offline, cookie
+        // host, etc.). The account is usable, so hand the user to the login
+        // page with a success notice instead of dead-ending them here.
+        await navigate({
+          to: "/login",
+          search: { next: safeNextPath(next), verified: email.trim() },
+        });
+        return;
+      }
       void saveSignupProfile({ data: { firstName: firstName.trim(), lastName: lastName.trim() } });
       await navigate({ to: safeNextPath(next) });
     } catch (err) {
+      setVerified(false);
       setError(err instanceof Error ? err.message : "Verification failed.");
       setDigits(Array(6).fill(""));
       verifiedRef.current = false; // allow re-entry + auto-verify again
+      focusOtp(0); // put the caret back so a retry is one keystroke away
     } finally {
       setBusy(false);
     }
@@ -132,14 +155,29 @@ function RegisterRoute() {
     }
   }
 
+  /** Focus one of the six code boxes (and select its digit). */
+  function focusOtp(index: number) {
+    const el = document.getElementById(`otp-${index}`) as HTMLInputElement | null;
+    el?.focus();
+    // Select so the next keystroke replaces the digit instead of appending.
+    el?.select();
+  }
+
   /**
-   * Functional state update (chains correctly under rapid input events — no
-   * stale-closure digit loss) + focus. NO side-effect verification here:
-   * verification happens once in the effect below, deduped by `verifiedRef`.
+   * Write `raw` (digits only) starting at `index` and move the caret along.
+   *
+   * The next focus target is computed SYNCHRONOUSLY. The previous version
+   * derived it inside the `setDigits` updater, which React may run during
+   * render rather than in the handler — so the caret never left the first box
+   * and each keystroke overwrote the previous digit (six presses of "041169"
+   * collapsed to "09"), which is why real typed codes were rejected as invalid.
    */
   function setOtpFrom(index: number, raw: string) {
-    const chars = raw.replace(/\D/g, "").split("");
-    let focusIndex = index;
+    const chars = raw.replace(/\D/g, "");
+    if (chars.length === 0) {
+      setDigits((d) => d.map((v, i) => (i === index ? "" : v)));
+      return;
+    }
     setDigits((prev) => {
       const next = [...prev];
       let i = index;
@@ -148,17 +186,12 @@ function RegisterRoute() {
         next[i] = ch;
         i += 1;
       }
-      focusIndex = Math.min(i, 5);
       return next;
     });
-    document.getElementById(`otp-${focusIndex}`)?.focus();
+    focusOtp(Math.min(index + chars.length, 5));
   }
 
   function onDigitChange(index: number, value: string) {
-    if (value === "") {
-      setDigits((d) => d.map((v, i) => (i === index ? "" : v)));
-      return;
-    }
     setOtpFrom(index, value);
   }
 
@@ -166,7 +199,7 @@ function RegisterRoute() {
     if (e.key === "Backspace" && !digits[index] && index > 0) {
       e.preventDefault();
       setDigits((d) => d.map((v, i) => (i === index - 1 ? "" : v)));
-      document.getElementById(`otp-${index - 1}`)?.focus();
+      focusOtp(index - 1);
     }
   }
 
@@ -177,7 +210,7 @@ function RegisterRoute() {
     const next = Array(6).fill("") as string[];
     pasted.split("").forEach((ch, i) => (next[i] = ch));
     setDigits(next);
-    document.getElementById(`otp-${Math.min(pasted.length, 5)}`)?.focus();
+    focusOtp(Math.min(pasted.length, 5));
   }
 
   // The code is valid for 10 minutes (OTP_TTL_SECONDS server-side) — once the
@@ -291,7 +324,7 @@ function RegisterRoute() {
                   </button>
                 </span>
                 <span className="mt-3 block text-[0.85rem] leading-snug text-muted">
-                  At least 8 characters with letters and numbers.
+                  {PASSWORD_HINT}
                 </span>
               </label>
               <label className="block">
@@ -413,11 +446,17 @@ function RegisterRoute() {
                   value={d}
                   onChange={(e) => onDigitChange(i, e.target.value)}
                   onKeyDown={(e) => onDigitKeyDown(i, e)}
+                  onFocus={(e) => e.currentTarget.select()}
                   disabled={busy}
                   aria-label={`Digit ${i + 1}`}
                 />
               ))}
             </div>
+            {verified && (
+              <p className="text-sm font-semibold text-primary" role="status">
+                Email verified — your account is ready. Signing you in…
+              </p>
+            )}
             {resendNotice && (
               <p className="text-sm text-primary" role="status">
                 {resendNotice}
@@ -434,7 +473,7 @@ function RegisterRoute() {
               disabled={busy || otp.length !== 6 || expired}
             >
               {busy ? (
-                "Verifying…"
+                verified ? "Email verified — signing you in…" : "Verifying…"
               ) : (
                 <>
                   <ShieldCheck className="size-4" />

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, ArrowRight, Link2, Lock, Mail } from "lucide-react";
+import { ArrowLeft, ArrowRight, Link2, Lock, Mail, RefreshCw } from "lucide-react";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { requestReset } from "@/lib/api/public";
 
@@ -26,22 +26,32 @@ const STEPS = [
 
 function ForgotPasswordRoute() {
   const [email, setEmail] = useState("");
+  const [sent, setSent] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
-  async function submit(event: React.FormEvent) {
-    event.preventDefault();
+  /** Shared by the initial send and the "resend" button. */
+  async function send(event?: React.FormEvent) {
+    event?.preventDefault();
     setBusy(true);
     setError("");
     setMessage("");
-    const result = await requestReset({ data: { email } });
-    setBusy(false);
-    if (!result.success) {
-      setError(result.message);
-      return;
+    try {
+      const result = await requestReset({ data: { email: email.trim() } });
+      if (!result.success) {
+        setError(result.message);
+        return;
+      }
+      // The server's answer is intentionally generic (it never reveals whether
+      // the address has an account), so the UI must not imply one either.
+      setMessage(result.message);
+      setSent(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not send the reset link.");
+    } finally {
+      setBusy(false);
     }
-    setMessage(result.message);
   }
 
   return (
@@ -84,42 +94,82 @@ function ForgotPasswordRoute() {
           </li>
         ))}
       </ul>
-      <form className="mt-11 space-y-7" onSubmit={(event) => void submit(event)}>
-        <label className="block">
-          <span className="field-label block">Email Address</span>
-          <span className="field mt-3">
-            <Mail className="size-[1.15rem]" strokeWidth={1.7} />
-            <input
-              type="email"
-              placeholder="you@example.com"
-              autoComplete="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              required
-            />
-          </span>
-        </label>
-        {error && (
-          <p className="text-sm text-danger" role="alert">
-            {error}
-          </p>
-        )}
-        {message && (
-          <p className="text-sm text-success" role="status">
+
+      {sent ? (
+        <div className="mt-11 space-y-6">
+          <p
+            className="rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-[0.95rem] text-ink"
+            role="status"
+          >
             {message}
           </p>
-        )}
-        <button type="submit" className="btn-primary mt-8 w-full" disabled={busy}>
-          {busy ? (
-            "Sending…"
-          ) : (
-            <>
-              Send Reset Link
-              <ArrowRight className="size-4" />
-            </>
+          <p className="text-[0.95rem] text-muted">
+            Sent to <strong className="text-ink">{email.trim()}</strong>. The link is valid for 30
+            minutes and can only be used once.
+          </p>
+          {error && (
+            <p className="text-sm text-danger" role="alert">
+              {error}
+            </p>
           )}
-        </button>
-      </form>
+          <div className="flex flex-col gap-3">
+            <button
+              type="button"
+              className="btn-outline w-full"
+              onClick={() => void send()}
+              disabled={busy}
+            >
+              <RefreshCw className={busy ? "size-4 animate-spin" : "size-4"} />
+              {busy ? "Sending…" : "Resend link"}
+            </button>
+            <button
+              type="button"
+              className="text-[0.9rem] font-semibold text-muted underline"
+              onClick={() => {
+                setSent(false);
+                setMessage("");
+                setError("");
+              }}
+            >
+              Use a different email
+            </button>
+          </div>
+        </div>
+      ) : (
+        <form className="mt-11 space-y-7" onSubmit={(event) => void send(event)}>
+          <label className="block">
+            <span className="field-label block">Email Address</span>
+            <span className="field mt-3">
+              <Mail className="size-[1.15rem]" strokeWidth={1.7} />
+              <input
+                type="email"
+                placeholder="you@example.com"
+                autoComplete="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                required
+                autoFocus
+              />
+            </span>
+          </label>
+          {error && (
+            <p className="text-sm text-danger" role="alert">
+              {error}
+            </p>
+          )}
+          <button type="submit" className="btn-primary mt-8 w-full" disabled={busy}>
+            {busy ? (
+              "Sending…"
+            ) : (
+              <>
+                Send Reset Link
+                <ArrowRight className="size-4" />
+              </>
+            )}
+          </button>
+        </form>
+      )}
+
       <p className="mt-9 text-center">
         <Link
           to="/login"

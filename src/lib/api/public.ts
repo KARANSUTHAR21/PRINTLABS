@@ -2,7 +2,12 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { getProduct, getService, listProducts, listServices } from "@/lib/server/catalog";
 import { asResult, ok, type ApiResult } from "@/lib/server/errors";
-import { requestPasswordReset, resetPasswordWithToken } from "@/lib/server/password-reset";
+import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from "@/lib/password";
+import {
+  checkResetToken,
+  requestPasswordReset,
+  resetPasswordWithToken,
+} from "@/lib/server/password-reset";
 import {
   requestRegistrationOtp,
   verifyRegistrationOtp,
@@ -60,7 +65,9 @@ export const fetchService = createServerFn({ method: "GET" })
   });
 
 export const requestReset = createServerFn({ method: "POST" })
-  .validator((data: unknown) => z.object({ email: z.string().email() }).parse(data))
+  .validator((data: unknown) =>
+    z.object({ email: z.string().trim().email().max(254) }).parse(data),
+  )
   .handler(async ({ data }): Promise<ApiResult<{ message: string }>> => {
     try {
       const result = await requestPasswordReset(data.email);
@@ -70,9 +77,33 @@ export const requestReset = createServerFn({ method: "POST" })
     }
   });
 
-export const confirmReset = createServerFn({ method: "POST" })
+/** Is this reset link still usable? Drives the page's expired-link state. */
+export const checkResetLink = createServerFn({ method: "POST" })
   .validator((data: unknown) =>
-    z.object({ token: z.string().min(16), password: z.string().min(8) }).parse(data),
+    z.object({ token: z.string().trim().min(1).max(200) }).parse(data),
+  )
+  .handler(async ({ data }): Promise<ApiResult<{ valid: boolean }>> => {
+    try {
+      return ok(await checkResetToken(data.token));
+    } catch (err) {
+      return asResult(err);
+    }
+  });
+
+export const confirmReset = createServerFn({ method: "POST" })
+  // Deliberately loose: the handler owns the strict checks so a bad link or a
+  // weak password comes back as a friendly ApiResult message, not a raw
+  // validator rejection the UI cannot render.
+  .validator((data: unknown) =>
+    z
+      .object({
+        token: z.string().trim().min(1).max(200),
+        password: z
+          .string()
+          .min(PASSWORD_MIN_LENGTH)
+          .max(PASSWORD_MAX_LENGTH),
+      })
+      .parse(data),
   )
   .handler(async ({ data }): Promise<ApiResult<{ message: string }>> => {
     try {

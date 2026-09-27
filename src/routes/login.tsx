@@ -7,17 +7,28 @@ import { authClient, storeSessionToken } from "@/lib/auth/client";
 import { emailAndPasswordEnabled } from "@/lib/auth/email-password";
 import { safeNextPath } from "@/lib/utils";
 
+/**
+ * `verified`/`reset` stay optional so existing `search={{ next }}` links remain
+ * valid. Both are one-shot notices from the flows that hand off to this page:
+ * `verified` after OTP signup, `reset` after a password reset.
+ */
+type LoginSearch = { next: string; verified?: string; reset?: string };
+
 export const Route = createFileRoute("/login")({
-  validateSearch: (search: Record<string, unknown>) => ({
+  validateSearch: (search: Record<string, unknown>): LoginSearch => ({
     next: typeof search.next === "string" ? search.next : "/",
+    /** Email of an account whose OTP was just verified (success banner). */
+    verified: typeof search.verified === "string" ? search.verified : undefined,
+    /** Set after a successful password reset (success banner). */
+    reset: typeof search.reset === "string" ? search.reset : undefined,
   }),
   component: LoginRoute,
 });
 
 function LoginRoute() {
-  const { next } = useSearch({ from: "/login" });
+  const { next, verified, reset } = useSearch({ from: "/login" });
   const navigate = useNavigate();
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(verified ?? "");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
@@ -66,6 +77,23 @@ function LoginRoute() {
     >
       <h1 className="text-[2.4rem] font-bold tracking-tight">Welcome Back</h1>
       <p className="mt-3 text-[1.05rem] text-muted">Login to your PrintHub account</p>
+      {verified && (
+        <p
+          className="mt-6 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-[0.95rem] text-ink"
+          role="status"
+        >
+          <strong>{verified}</strong> is verified — your PrintHub account is ready. Log in to
+          continue.
+        </p>
+      )}
+      {reset && (
+        <p
+          className="mt-6 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-[0.95rem] text-ink"
+          role="status"
+        >
+          Your password has been updated. Sign in with your new password.
+        </p>
+      )}
       {emailAndPasswordEnabled && (
         <form className="mt-9 space-y-7" onSubmit={(e) => void submit(e)}>
           <label className="block">
