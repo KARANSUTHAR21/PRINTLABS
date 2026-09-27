@@ -1,4 +1,6 @@
 import { env } from "@/lib/env.server";
+import { RESET_LINK_TTL_MINUTES } from "@/lib/reset-link";
+import { INVOICE_LINK_TTL_MS } from "./invoice-link";
 
 /**
  * Transactional email (spec Phase 7) — **Brevo**.
@@ -92,10 +94,15 @@ export async function sendMail(mail: Mail): Promise<{ sent: boolean }> {
     // Brevo API first; the logged no-op only when NEITHER transport is set.
     const viaApi = await sendViaBrevoApi(mail);
     if (viaApi) return viaApi;
+    // Attachment names/sizes are logged too: it is the only way to see that an
+    // invoice really went out WITH its PDF when no transport is configured.
     console.info(
-      "[email:nop] to=%s subject=%s\n%s",
+      "[email:nop] to=%s subject=%s%s\n%s",
       mail.to,
       mail.subject,
+      mail.attachments?.length
+        ? ` attachments=${mail.attachments.map((a) => `${a.filename}(${a.content.length}B)`).join(",")}`
+        : "",
       mail.text.slice(0, 500),
     );
     return { sent: false };
@@ -153,7 +160,7 @@ export function sendRegistrationOtpMail(to: string, name: string, code: string, 
   });
 }
 
-/** Password reset — the link is single-use, 30-minute TTL (password_resets). */
+/** Password reset — the link is single-use and short-lived (password_resets). */
 export function sendPasswordResetMail(to: string, resetLink: string) {
   return sendMail({
     to,
@@ -161,12 +168,12 @@ export function sendPasswordResetMail(to: string, resetLink: string) {
     text: [
       "We received a request to reset your PrintHub password.",
       "",
-      `Reset link (valid 30 minutes, single use): ${resetLink}`,
+      `Reset link (valid ${RESET_LINK_TTL_MINUTES} minutes, single use): ${resetLink}`,
       "",
       "If you didn't request this, you can safely ignore this email.",
     ].join("\n"),
     html: `<p>We received a request to reset your PrintHub password.</p>
-<p><a href="${resetLink}">Reset your password</a> — valid 30 minutes, single use.</p>
+<p><a href="${resetLink}">Reset your password</a> — valid ${RESET_LINK_TTL_MINUTES} minutes, single use.</p>
 <p>If you didn't request this, you can safely ignore this email.</p>`,
   });
 }
@@ -189,6 +196,8 @@ export function sendOrderConfirmationMail(input: {
   items: OrderMailLine[];
   totalPaise: number;
   customerName?: string;
+  /** Signed, login-free link to the invoice PDF (see `invoice-link.ts`). */
+  invoiceUrl?: string | null;
 }) {
   const name = input.customerName?.trim() || "there";
   const lines = orderLines(input.items, input.totalPaise);
@@ -200,6 +209,7 @@ export function sendOrderConfirmationMail(input: {
       "",
       `Your payment for order ${input.orderId} succeeded and your order is confirmed.`,
       input.invoiceNumber ? `Invoice: ${input.invoiceNumber}` : "",
+      input.invoiceUrl ? `Invoice PDF: ${input.invoiceUrl}` : "",
       "",
       "Items:",
       lines,
@@ -210,21 +220,63 @@ export function sendOrderConfirmationMail(input: {
       .join("\n"),
     html: `<p>Hi ${escapeHtml(name)},</p>
 <p>Your payment for order <strong>${escapeHtml(input.orderId)}</strong> succeeded — the order is confirmed${input.invoiceNumber ? ` (invoice ${escapeHtml(input.invoiceNumber)})` : ""}.</p>
+${input.invoiceUrl ? `<p><a href="${escapeHtml(input.invoiceUrl)}">Download invoice ${escapeHtml(input.invoiceNumber ?? "")} (PDF)</a></p>` : ""}
 <pre>${escapeHtml(lines)}</pre>
 <p>Track it any time under <strong>Orders</strong> on PrintHub.</p>`,
   });
 }
 
-/** Invoice-ready notification — sent when the PDF becomes available. */
+/**
+ * Invoice delivery — the rendered invoice PDF rides along as an ATTACHMENT.
+ *
+ * The customer asked for the document, not a pointer to it: a mail whose body
+ * only says "go and download it" is not an invoice. `pdf` is required so this
+ * can never silently degrade into a text-only notification.
+ */
 export function sendInvoiceReadyMail(input: {
   to: string;
   orderId: string;
   invoiceNumber: string;
+  /** The rendered invoice bytes (`buildInvoicePdf`). */
+  pdf: Uint8Array;
+  /**
+   * Signed link to the same PDF, usable without signing in. Always prefer this
+   * over telling the customer to go and find the document themselves.
+   */
+  pdfUrl?: string | null;
 }) {
+  const filename = `${input.invoiceNumber}.pdf`;
+  const linkDays = Math.round(INVOICE_LINK_TTL_MS / (24 * 60 * 60_000));
+  const text = [
+    `Thanks for your order ${input.orderId}.`,
+    "",
+    `Your invoice ${input.invoiceNumber} is attached to this email as a PDF (${filename}).`,
+    ...(input.pdfUrl
+      ? [
+          "",
+          `Download it here: ${input.pdfUrl}`,
+          `(The link works without signing in and is valid for ${linkDays} days.)`,
+        ]
+      : ["", "You can also download it from the Orders page on PrintHub."]),
+  ].join("\n");
   return sendMail({
     to: input.to,
-    subject: `Your PrintHub invoice ${input.invoiceNumber} is ready`,
-    text: `Invoice ${input.invoiceNumber} for order ${input.orderId} is ready to download from your Orders page on PrintHub.`,
+    subject: `Your PrintHub invoice ${input.invoiceNumber} (PDF attached)`,
+    text,
+    html: `<p>Thanks for your order <strong>${escapeHtml(input.orderId)}</strong>.</p>
+<p>Your invoice <strong>${escapeHtml(input.invoiceNumber)}</strong> is attached to this email as a PDF (<code>${escapeHtml(filename)}</code>).</p>
+${
+  input.pdfUrl
+    ? `<p><a href="${escapeHtml(input.pdfUrl)}">Download invoice ${escapeHtml(input.invoiceNumber)} (PDF)</a> — no sign-in needed, valid for ${linkDays} days.</p>`
+    : "<p>You can also download it any time from the <strong>Orders</strong> page on PrintHub.</p>"
+}`,
+    attachments: [
+      {
+        filename,
+        content: Buffer.from(input.pdf),
+        contentType: "application/pdf",
+      },
+    ],
   });
 }
 

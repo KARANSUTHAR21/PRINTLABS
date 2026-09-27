@@ -5,16 +5,17 @@
  *
  *  1. `requestPasswordReset(email)` — always answers with the same generic
  *     message. Only when an account exists do we mint a single-use token and
- *     email a link. Issuing a new link CONSUMES any previous unused link, so a
- *     user reading an older email can never be confused by a dead code.
+ *     email a link. Asking again REPLACES the previous link (one row per
+ *     address), so a user reading an older email can never be confused by a
+ *     dead code and the table holds no duplicate addresses.
  *  2. `resetPasswordWithToken(token, password)` — validates the token, applies
- *     the shared password policy, revokes every existing session, and burns all
- *     of the account's reset tokens.
+ *     the shared password policy, revokes every existing session, and burns the
+ *     address's reset link.
  *
  * Security notes:
  *  - Only the sha256 of the token is stored; the raw value lives in the email.
- *  - 30-minute expiry, single use, and a strict 64-hex shape check before any
- *    database lookup.
+ *  - Ten-minute expiry (RESET_LINK_TTL_MS), single use, and a strict 64-hex
+ *    shape check before any database lookup.
  *  - Sessions are deleted on success: a reset is exactly the moment you want a
  *    stolen session to stop working.
  *  - The emailed link is built from the request's own origin whenever
@@ -22,70 +23,22 @@
  *    that forgets to configure it still sends a working link.
  */
 import { getSql } from "@/lib/db";
-import { env } from "@/lib/env.server";
 import { passwordProblem } from "@/lib/password";
+import { RESET_LINK_TTL_MS } from "@/lib/reset-link";
 import { newId, randomToken, sha256 } from "./crypto-utils";
 import { sendPasswordResetMail } from "./email";
 import { fail } from "./errors";
+import { publicBaseUrl } from "./public-url";
 import { rateLimit } from "./rate-limit";
 
 /** Never discloses whether the address belongs to an account. */
 const GENERIC = "If an account exists for this email, a reset link has been sent.";
 
-/** How long a reset link stays valid. */
-export const RESET_TTL_MS = 30 * 60_000;
+/** How long a reset link stays valid (shared with the UI copy). */
+export const RESET_TTL_MS = RESET_LINK_TTL_MS;
 
 /** `randomToken(32)` → 64 lowercase hex characters. */
 const TOKEN_PATTERN = /^[a-f0-9]{64}$/;
-
-/** Loopback origins are a development convenience, never a production link. */
-function isLoopbackOrigin(url: string): boolean {
-  try {
-    const { hostname } = new URL(url);
-    return (
-      hostname === "localhost" ||
-      hostname === "127.0.0.1" ||
-      hostname === "0.0.0.0" ||
-      hostname === "::1" ||
-      hostname.endsWith(".localhost")
-    );
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Base URL for the emailed link.
- *
- * A configured `FRONTEND_URL` wins, but only when it is a real (non-loopback)
- * URL — a leftover `http://localhost:8080` must not be mailed to production
- * users. When it is missing or loopback we use the origin the request actually
- * arrived on, and only fall back to localhost when there is no request at all
- * (node:test, background jobs).
- */
-export function resolveResetBaseUrl(
-  configured: string | undefined,
-  origin: string | null,
-): string {
-  const trimmed = configured?.trim().replace(/\/+$/, "") ?? "";
-  if (trimmed && !isLoopbackOrigin(trimmed)) return trimmed;
-  if (origin) return origin.replace(/\/+$/, "");
-  return trimmed || "http://localhost:8080";
-}
-
-/**
- * Origin of the current request. Dynamically imported so this module (which the
- * client-adjacent `api/public.ts` imports) never statically pulls
- * `@tanstack/react-start/server` into a browser bundle.
- */
-async function currentOrigin(): Promise<string | null> {
-  try {
-    const { requestOrigin } = await import("./request-origin.server");
-    return requestOrigin();
-  } catch {
-    return null;
-  }
-}
 
 /** Step 1 — mint a link and email it (or pretend to). */
 export async function requestPasswordReset(email: string) {
@@ -102,20 +55,22 @@ export async function requestPasswordReset(email: string) {
     const tokenHash = sha256(token);
     const expires = new Date(Date.now() + RESET_TTL_MS).toISOString();
 
-    // Consume any earlier link FIRST, so the row we are about to insert is the
-    // only live one ("resend" replaces the link instead of stacking a second).
-    await sql`
-      update password_resets set used_at = now()
-      where user_id = ${users[0].id} and used_at is null
-    `;
-
+    // ONE row per address (`password_resets_email_unique`): asking again
+    // REPLACES the live link rather than stacking a second one, so an older
+    // email can never be a dead end and the table never accumulates
+    // duplicate addresses.
     await sql`
       insert into password_resets (id, user_id, email, token_hash, expires_at)
       values (${newId("rst")}, ${users[0].id}, ${normalized}, ${tokenHash}, ${expires})
+      on conflict (lower(email)) do update set
+        user_id = excluded.user_id,
+        token_hash = excluded.token_hash,
+        expires_at = excluded.expires_at,
+        used_at = null,
+        created_at = now()
     `;
 
-    const base = resolveResetBaseUrl(env("FRONTEND_URL"), await currentOrigin());
-    const link = `${base}/reset-password/${token}`;
+    const link = `${await publicBaseUrl()}/reset-password/${token}`;
     // Fire-and-forget: a mail outage must not turn into a user enumeration
     // oracle or slow the response (spec §75 — failures never fail the flow).
     void sendPasswordResetMail(normalized, link);

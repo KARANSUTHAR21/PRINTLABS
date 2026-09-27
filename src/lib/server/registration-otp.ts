@@ -59,27 +59,30 @@ export async function requestRegistrationOtp(
   const pending = await sql<{ id: string }>`
     select id from registration_otps
     where lower(email) = ${email} and verified_at is null and consumed_at is null
-    order by created_at desc limit 1
+    limit 1
   `;
   const resend = pending.length > 0;
 
   const code = randomOTP();
   const passwordHash = await hashPassword(input.password);
   const expires = new Date(Date.now() + OTP_TTL_SECONDS * 1000).toISOString();
-  const rowId = newId("rot");
 
+  // ONE row per address (`registration_otps_email_unique`): a repeat request
+  // REPLACES the pending code — new hash, new expiry, attempts reset — instead
+  // of inserting a second row for the same email and then invalidating it.
   await sql`
     insert into registration_otps (id, email, name, password_hash, code_hash, expires_at)
-    values (${rowId}, ${email}, ${name}, ${passwordHash}, ${sha256(code)}, ${expires})
+    values (${newId("rot")}, ${email}, ${name}, ${passwordHash}, ${sha256(code)}, ${expires})
+    on conflict (lower(email)) do update set
+      name = excluded.name,
+      password_hash = excluded.password_hash,
+      code_hash = excluded.code_hash,
+      expires_at = excluded.expires_at,
+      attempts = 0,
+      verified_at = null,
+      consumed_at = null,
+      created_at = now()
   `;
-  if (resend) {
-    // Invalidate any OLDER pending codes for this email (never the new row).
-    await sql`
-      update registration_otps set consumed_at = now()
-      where lower(email) = ${email} and id <> ${rowId}
-        and verified_at is null and consumed_at is null
-    `;
-  }
 
   // Fire-and-forget: delivery failure must not fail the request (spec §75).
   void sendRegistrationOtpMail(email, name, code, OTP_TTL_SECONDS);

@@ -4,7 +4,9 @@ import { newId } from "./crypto-utils";
 import { sendInvoiceReadyMail, sendOrderConfirmationMail } from "./email";
 import { fail } from "./errors";
 import { readIdempotent, writeIdempotent } from "./idempotency";
-import { ensureInvoice } from "./invoices";
+import { buildInvoicePdf, ensureInvoice, type InvoiceRecord } from "./invoices";
+import { invoicePdfLink } from "./invoice-link";
+import { publicBaseUrl } from "./public-url";
 import { withLock } from "./locks";
 import {
   assertPaymentTransition,
@@ -166,26 +168,58 @@ export async function finalizePaid(input: {
   // fail a paid order. `finalizePaid` runs for BOTH the browser verify path and
   // the webhook path, so the customer is mailed exactly once — whichever path
   // wins the idempotent finalize (the loser returns early at `already`).
-  void notifyOrderPaid(paid, invoice.invoiceNumber);
+  void notifyOrderPaid(paid, invoice);
   const fresh = await getOrderForUser(order.id, order.userId, true);
   return { order: fresh ?? paid, already: false };
 }
 
-/** Best-effort customer notifications after a payment lands. Never throws. */
-async function notifyOrderPaid(order: OrderRecord, invoiceNumber: string | null) {
+/**
+ * Best-effort customer notifications after a payment lands. Never throws.
+ *
+ * Exported so the paid-order → invoice-PDF path can be exercised in tests; the
+ * payments flow itself still calls it fire-and-forget.
+ */
+export async function notifyOrderPaid(order: OrderRecord, invoice: InvoiceRecord) {
   try {
     const email = order.customer.email;
     if (!email) return;
+
+    // Signed, login-free link to the PDF — a customer reading the mail on a
+    // device where they are not signed in must still be able to open it.
+    const invoiceUrl = invoicePdfLink(await publicBaseUrl(), order.id);
+    if (!invoiceUrl) {
+      console.warn(
+        "[email] no signing secret (BETTER_AUTH_SECRET) — invoice mail has no PDF link",
+      );
+    }
+
     await sendOrderConfirmationMail({
       to: email,
       orderId: order.id,
-      invoiceNumber,
+      invoiceNumber: invoice.invoiceNumber,
       items: order.items,
       totalPaise: order.totalPaise,
       customerName: [order.customer.firstName, order.customer.lastName].filter(Boolean).join(" "),
+      invoiceUrl,
     });
-    if (invoiceNumber) {
-      await sendInvoiceReadyMail({ to: email, orderId: order.id, invoiceNumber });
+    // The invoice goes out as a PDF ATTACHMENT. Rendering happens here rather
+    // than at send time so a failure is caught per-message: the order
+    // confirmation above has already been delivered, and a build error must
+    // not turn into a text-only "your invoice is ready" mail.
+    try {
+      const pdf = await buildInvoicePdf(invoice, order.customer);
+      await sendInvoiceReadyMail({
+        to: email,
+        orderId: order.id,
+        invoiceNumber: invoice.invoiceNumber,
+        pdf,
+        pdfUrl: invoiceUrl,
+      });
+    } catch (err) {
+      console.error(
+        "[email] invoice PDF build failed — invoice email skipped:",
+        err instanceof Error ? err.message : err,
+      );
     }
   } catch (err) {
     console.error("[email] order notification failed:", err instanceof Error ? err.message : err);

@@ -20,9 +20,11 @@ import test from "node:test";
 process.env.MAIL_SERVER = "";
 process.env.BREVO_API_KEY = "";
 
-const { requestPasswordReset, resetPasswordWithToken, resolveResetBaseUrl } = await import(
+const { requestPasswordReset, resetPasswordWithToken } = await import(
   "../src/lib/server/password-reset.ts"
 );
+const { resolvePublicBaseUrl } = await import("../src/lib/server/public-url.ts");
+const { RESET_LINK_TTL_MINUTES } = await import("../src/lib/reset-link.ts");
 const { insertCredentialUser } = await import("../src/lib/server/credential-accounts.ts");
 const { getSql } = await import("../src/lib/db.ts");
 const { sha256 } = await import("../src/lib/server/crypto-utils.ts");
@@ -65,19 +67,19 @@ async function resetRow(userId) {
   return rows;
 }
 
-test("resolveResetBaseUrl prefers a real origin over a leftover localhost", () => {
+test("resolvePublicBaseUrl prefers a real origin over a leftover localhost", () => {
   assert.equal(
-    resolveResetBaseUrl("https://printhub.example", "http://127.0.0.1:8080"),
+    resolvePublicBaseUrl("https://printhub.example", "http://127.0.0.1:8080"),
     "https://printhub.example",
   );
-  assert.equal(resolveResetBaseUrl("https://printhub.example/", null), "https://printhub.example");
+  assert.equal(resolvePublicBaseUrl("https://printhub.example/", null), "https://printhub.example");
   // A `http://localhost:8080` left in a deploy's env must NOT reach users.
   assert.equal(
-    resolveResetBaseUrl("http://localhost:8080", "https://shop.grok.me"),
+    resolvePublicBaseUrl("http://localhost:8080", "https://shop.grok.me"),
     "https://shop.grok.me",
   );
-  assert.equal(resolveResetBaseUrl(undefined, "https://shop.grok.me"), "https://shop.grok.me");
-  assert.equal(resolveResetBaseUrl(undefined, null), "http://localhost:8080");
+  assert.equal(resolvePublicBaseUrl(undefined, "https://shop.grok.me"), "https://shop.grok.me");
+  assert.equal(resolvePublicBaseUrl(undefined, null), "http://localhost:8080");
 });
 
 test("the link's token is stored only as a hash", async () => {
@@ -97,9 +99,11 @@ test("requesting a new link invalidates the previous one", async () => {
   const second = await captureToken(() => requestPasswordReset(email));
   assert.notEqual(first, second);
 
+  // One row per address — the table can never accumulate duplicate emails.
   const rows = await resetRow(userId);
-  assert.equal(rows.length, 2);
-  assert.equal(rows.filter((r) => r.used_at === null).length, 1, "exactly one live link");
+  assert.equal(rows.length, 1, "one row per email address");
+  assert.equal(rows[0].used_at, null, "the surviving row is the live link");
+  assert.equal(rows[0].token_hash, sha256(second), "…and it holds the new token");
 
   await assert.rejects(
     () => resetPasswordWithToken(first, "NewPassw0rd!1"),
@@ -118,6 +122,53 @@ test("a reset link can only be used once", async () => {
   await assert.rejects(
     () => resetPasswordWithToken(token, "AnotherPassw0rd!2"),
     /invalid or has expired/,
+  );
+});
+
+test("a link is valid for ten minutes and no longer", async () => {
+  assert.equal(RESET_LINK_TTL_MINUTES, 10, "the window the UI promises");
+
+  const { email, userId } = await makeUser("window");
+  const token = await captureToken(() => requestPasswordReset(email));
+  const sql = await getSql();
+
+  const [stored] = await sql`
+    select extract(epoch from (expires_at - now()))::int as secs
+    from password_resets where user_id = ${userId}
+  `;
+  assert.ok(
+    stored.secs > 590 && stored.secs <= 600,
+    `expiry is ten minutes out (got ${stored.secs}s)`,
+  );
+
+  // One second before the deadline: still usable.
+  await sql`
+    update password_resets set expires_at = now() + interval '1 second'
+    where user_id = ${userId}
+  `;
+  const ok = await resetPasswordWithToken(token, "NewPassw0rd!1");
+  assert.match(ok.message, /updated/i, "a link used inside the window works");
+
+  // One second after it: refused, and nothing changes.
+  const second = await captureToken(() => requestPasswordReset(email));
+  await sql`
+    update password_resets set expires_at = now() - interval '1 second'
+    where user_id = ${userId}
+  `;
+  await assert.rejects(
+    () => resetPasswordWithToken(second, "AnotherPassw0rd!2"),
+    /expired/i,
+    "a link used after the window is refused",
+  );
+
+  const [account] = await sql`
+    select password from "account"
+    where "userId" = ${userId} and "providerId" = 'credential'
+  `;
+  assert.equal(
+    await verifyPassword({ hash: account.password, password: "NewPassw0rd!1" }),
+    true,
+    "the post-deadline attempt did not change the password",
   );
 });
 

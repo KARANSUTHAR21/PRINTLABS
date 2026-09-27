@@ -111,9 +111,6 @@ function InvoicePage() {
           <Link to="/orders/$orderId" params={{ orderId: invoice.orderId }} className="btn-outline">
             View order
           </Link>
-          <Link to="/orders" className="btn-outline">
-            View orders
-          </Link>
           <Link to="/products" className="btn-primary">
             <CheckCircle2 className="size-4" />
             Continue shopping

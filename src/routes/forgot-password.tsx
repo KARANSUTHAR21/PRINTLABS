@@ -3,6 +3,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowLeft, ArrowRight, Link2, Lock, Mail, RefreshCw } from "lucide-react";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { requestReset } from "@/lib/api/public";
+import { RESET_LINK_TTL_MINUTES } from "@/lib/reset-link";
 
 export const Route = createFileRoute("/forgot-password")({ component: ForgotPasswordRoute });
 
@@ -104,8 +105,8 @@ function ForgotPasswordRoute() {
             {message}
           </p>
           <p className="text-[0.95rem] text-muted">
-            Sent to <strong className="text-ink">{email.trim()}</strong>. The link is valid for 30
-            minutes and can only be used once.
+            Sent to <strong className="text-ink">{email.trim()}</strong>. The link is valid for{" "}
+            {RESET_LINK_TTL_MINUTES} minutes and can only be used once.
           </p>
           {error && (
             <p className="text-sm text-danger" role="alert">

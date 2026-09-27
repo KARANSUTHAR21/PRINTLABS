@@ -25,6 +25,11 @@ export type CredentialAccountInput = {
   role?: "USER" | "ADMIN";
 };
 
+/** Postgres unique-violation (SQLSTATE 23505) — pg and PGLite both set `code`. */
+function isUniqueViolation(err: unknown): boolean {
+  return typeof err === "object" && err !== null && (err as { code?: string }).code === "23505";
+}
+
 /** True when a local credential account already exists for the email. */
 export async function credentialAccountExists(email: string): Promise<boolean> {
   const sql = await getSql();
@@ -50,11 +55,21 @@ export async function insertCredentialUser(input: CredentialAccountInput): Promi
   if (taken[0]) fail("An account with this email already exists. Please sign in.", 409, "EMAIL_TAKEN");
 
   const userId = randomUUID().replaceAll("-", "");
-  await sql.query(
-    `insert into "user" ("id", "name", "email", "emailVerified", "createdAt", "updatedAt")
-     values ($1, $2, $3, $4, now(), now())`,
-    [userId, input.name, email, input.emailVerified ?? false],
-  );
+  try {
+    await sql.query(
+      `insert into "user" ("id", "name", "email", "emailVerified", "createdAt", "updatedAt")
+       values ($1, $2, $3, $4, now(), now())`,
+      [userId, input.name, email, input.emailVerified ?? false],
+    );
+  } catch (err) {
+    // The unique indexes on `email` and `lower(email)` are the final authority.
+    // A race with the check above — or a case-variant of an address that
+    // already exists (`A@x.com` vs `a@x.com`) — must read as "taken", not 500.
+    if (isUniqueViolation(err)) {
+      fail("An account with this email already exists. Please sign in.", 409, "EMAIL_TAKEN");
+    }
+    throw err;
+  }
   await sql.query(
     `insert into "account"
        ("id", "accountId", "providerId", "userId", "password", "createdAt", "updatedAt")

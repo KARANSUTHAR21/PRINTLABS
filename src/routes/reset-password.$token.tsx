@@ -4,6 +4,7 @@ import { Eye, EyeOff, Lock, ShieldAlert } from "lucide-react";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { checkResetLink, confirmReset } from "@/lib/api/public";
 import { PASSWORD_HINT, passwordProblem } from "@/lib/password";
+import { RESET_LINK_TTL_MINUTES } from "@/lib/reset-link";
 
 export const Route = createFileRoute("/reset-password/$token")({ component: ResetPasswordRoute });
 
@@ -114,7 +115,7 @@ function ResetPasswordRoute() {
             <ShieldAlert className="mt-0.5 size-[1.15rem] shrink-0 text-danger" strokeWidth={1.8} />
             <span>
               {error || "This reset link is invalid or has expired."} Reset links are single-use and
-              last 30 minutes.
+              last {RESET_LINK_TTL_MINUTES} minutes.
             </span>
           </p>
           <Link to="/forgot-password" className="btn-primary w-full">
