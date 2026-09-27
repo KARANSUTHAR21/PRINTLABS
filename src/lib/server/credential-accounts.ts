@@ -43,6 +43,32 @@ export async function credentialAccountExists(email: string): Promise<boolean> {
 }
 
 /**
+ * Persist a password hash for a user, creating the credential account row when
+ * it does not exist yet.
+ *
+ * Better Auth's `internalAdapter.updatePassword` only UPDATEs an existing
+ * `credential` row. A user who signed up with Google has only a `google` row,
+ * so that call wrote **nothing** while the reset flow still answered "your
+ * password has been updated" — the link got burned and the new password could
+ * never be used. This upsert is the fix: the reset always lands.
+ *
+ * `account_credential_user_unique` (migrations/0009) makes one credential row
+ * per user an invariant, so two concurrent resets converge instead of
+ * duplicating the account.
+ */
+export async function setCredentialPassword(userId: string, passwordHash: string): Promise<void> {
+  const sql = await getSql();
+  await sql.query(
+    `insert into "account"
+       ("id", "accountId", "providerId", "userId", "password", "createdAt", "updatedAt")
+     values ($1, $2, 'credential', $3, $4, now(), now())
+     on conflict ("userId") where "providerId" = 'credential'
+     do update set "password" = excluded."password", "updatedAt" = now()`,
+    [randomUUID().replaceAll("-", ""), userId, userId, passwordHash],
+  );
+}
+
+/**
  * Create a local credential user. Throws 409 `EMAIL_TAKEN` when the email is
  * already registered (checked inside the same flow — the unique constraint is
  * the final authority).

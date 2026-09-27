@@ -237,3 +237,85 @@ test("a successful reset rewrites the password and revokes every session", async
     "the old password no longer works",
   );
 });
+
+/** A user who signed up with Google: a `google` account row and no credential row. */
+async function makeSocialUser(tag) {
+  const sql = await getSql();
+  const email = `oauth.${tag}.${RUN}@example.com`;
+  const userId = `usr_oauth_${tag}_${RUN}`;
+  await sql.query(
+    `insert into "user" ("id", "name", "email", "emailVerified", "createdAt", "updatedAt")
+     values ($1, $2, $3, true, now(), now())`,
+    [userId, `OAuth ${tag}`, email],
+  );
+  await sql.query(
+    `insert into "account" ("id", "accountId", "providerId", "userId", "createdAt", "updatedAt")
+     values ($1, $2, 'google', $3, now(), now())`,
+    [`acc_google_${tag}_${RUN}`, `google-sub-${tag}-${RUN}`, userId],
+  );
+  await sql.query(
+    `insert into user_profiles (user_id, first_name, last_name, role)
+     values ($1, 'OAuth', $2, 'USER') on conflict (user_id) do nothing`,
+    [userId, tag],
+  );
+  return { email, userId };
+}
+
+test("a reset SETS a password for a Google-only account (it must not claim success)", async () => {
+  const { email, userId } = await makeSocialUser("only");
+  const sql = await getSql();
+
+  const before = await sql`
+    select "providerId", password from "account" where "userId" = ${userId}
+  `;
+  assert.equal(before.length, 1, "the user starts with only the google account row");
+  assert.equal(before[0].password, null, "and no password at all");
+
+  const token = await captureToken(() => requestPasswordReset(email));
+  assert.ok(token, "a Google-only user can still request a reset link");
+  await resetPasswordWithToken(token, "SocialReset!1");
+
+  const rows = await sql`
+    select "providerId", password from "account" where "userId" = ${userId}
+    order by "providerId"
+  `;
+  const credential = rows.find((r) => r.providerId === "credential");
+  assert.ok(credential, "a credential row is created so the reset actually takes effect");
+  assert.equal(
+    credential.accountId,
+    undefined,
+    "(sanity) the row is the credential account",
+  );
+  assert.equal(
+    await verifyPassword({ hash: credential.password, password: "SocialReset!1" }),
+    true,
+    "the new password really is in the database",
+  );
+  assert.equal(rows.length, 2, "the google row is preserved alongside the new credential row");
+});
+
+test("resetting again UPDATEs the credential row instead of duplicating it", async () => {
+  const { email, userId } = await makeSocialUser("twice");
+  const sql = await getSql();
+
+  const first = await captureToken(() => requestPasswordReset(email));
+  await resetPasswordWithToken(first, "FirstReset!1");
+  const second = await captureToken(() => requestPasswordReset(email));
+  await resetPasswordWithToken(second, "SecondReset!2");
+
+  const rows = await sql`
+    select password from "account"
+    where "userId" = ${userId} and "providerId" = 'credential'
+  `;
+  assert.equal(rows.length, 1, "one credential row per user, however many resets happen");
+  assert.equal(
+    await verifyPassword({ hash: rows[0].password, password: "SecondReset!2" }),
+    true,
+    "the newest password wins",
+  );
+  assert.equal(
+    await verifyPassword({ hash: rows[0].password, password: "FirstReset!1" }),
+    false,
+    "the superseded password is gone",
+  );
+});

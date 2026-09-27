@@ -16,6 +16,9 @@
  *  - Only the sha256 of the token is stored; the raw value lives in the email.
  *  - Ten-minute expiry (RESET_LINK_TTL_MS), single use, and a strict 64-hex
  *    shape check before any database lookup.
+ *  - The new password is written through `setCredentialPassword`, so an account
+ *    that only ever had a social (Google) provider gets a credential row and
+ *    the reset actually takes effect instead of silently no-op'ing.
  *  - Sessions are deleted on success: a reset is exactly the moment you want a
  *    stolen session to stop working.
  *  - The emailed link is built from the request's own origin whenever
@@ -25,6 +28,7 @@
 import { getSql } from "@/lib/db";
 import { passwordProblem } from "@/lib/password";
 import { RESET_LINK_TTL_MS } from "@/lib/reset-link";
+import { setCredentialPassword } from "./credential-accounts";
 import { newId, randomToken, sha256 } from "./crypto-utils";
 import { sendPasswordResetMail } from "./email";
 import { fail } from "./errors";
@@ -134,7 +138,11 @@ export async function resetPasswordWithToken(token: string, newPassword: string)
   const { auth } = await import("@/lib/auth/server");
   const ctx = await auth.$context;
   const hash = await ctx.password.hash(newPassword);
-  await ctx.internalAdapter.updatePassword(row.user_id, hash);
+  // Through the module that owns credential writes: Better Auth's
+  // `updatePassword` only updates an EXISTING credential row, so for a
+  // Google-signup user it wrote nothing while we still reported success and
+  // burned the link.
+  await setCredentialPassword(row.user_id, hash);
 
   // A password reset invalidates every existing session — the whole point is
   // that anyone else holding a session loses it.
