@@ -1,4 +1,4 @@
-import { env } from "@/lib/env.server";
+import { env, isWorkspacePreview } from "@/lib/env.server";
 import { hmacSha256Hex, newId, safeEqual } from "./crypto-utils";
 
 export type ProviderOrder = {
@@ -27,17 +27,26 @@ export function isLiveRazorpay(): boolean {
   return Boolean(razorpayKeys());
 }
 
+/** Test-mode payment confirmation is restricted to non-production workspaces. */
+export function sandboxPaymentsEnabled(): boolean {
+  return process.env.NODE_ENV !== "production" && isWorkspacePreview();
+}
+
 export function signPayment(orderId: string, paymentId: string): string {
   return hmacSha256Hex(paymentSecret(), `${orderId}|${paymentId}`);
 }
 
 export function verifyPaymentSignature(orderId: string, paymentId: string, signature: string): boolean {
-  return safeEqual(signPayment(orderId, paymentId), signature);
+  const keys = razorpayKeys();
+  if (!keys && !sandboxPaymentsEnabled()) return false;
+  const expected = hmacSha256Hex(keys?.keySecret ?? paymentSecret(), `${orderId}|${paymentId}`);
+  return safeEqual(expected, signature);
 }
 
 export function verifyWebhookSignature(rawBody: string, signature: string): boolean {
-  const secret = env("RAZORPAY_WEBHOOK_SECRET") || paymentSecret();
-  return safeEqual(hmacSha256Hex(secret, rawBody), signature);
+  const secret = env("RAZORPAY_WEBHOOK_SECRET") || razorpayKeys()?.keySecret;
+  if (!secret && !sandboxPaymentsEnabled()) return false;
+  return safeEqual(hmacSha256Hex(secret ?? paymentSecret(), rawBody), signature);
 }
 
 export async function createProviderOrder(input: {
@@ -45,8 +54,12 @@ export async function createProviderOrder(input: {
   currency: string;
   receipt: string;
 }): Promise<ProviderOrder> {
+  const keyId = env("RAZORPAY_KEY_ID");
+  const keySecret = env("RAZORPAY_KEY_SECRET");
   const keys = razorpayKeys();
   if (!keys) {
+    if (keyId || keySecret) throw new Error("Razorpay credentials are incomplete.");
+    if (!sandboxPaymentsEnabled()) throw new Error("Payment provider is not configured.");
     return {
       id: `order_sandbox_${newId("rz")}`,
       amountPaise: input.amountPaise,
@@ -73,8 +86,8 @@ export async function createProviderOrder(input: {
     throw new Error(`Razorpay order failed: ${text.slice(0, 200)}`);
   }
   const json = (await res.json()) as { id: string; amount: number; currency: string };
-  if (json.amount !== input.amountPaise) {
-    throw new Error("Provider amount does not match calculated total.");
+  if (!json.id || json.amount !== input.amountPaise || json.currency !== input.currency) {
+    throw new Error("Provider order does not match the requested amount and currency.");
   }
   return { id: json.id, amountPaise: json.amount, currency: json.currency, sandbox: false };
 }
@@ -98,5 +111,7 @@ export async function fetchProviderPayment(paymentId: string): Promise<{
     amount: number;
     order_id: string;
   };
+  if (typeof json.id !== "string" || typeof json.status !== "string" ||
+      !Number.isSafeInteger(json.amount) || typeof json.order_id !== "string") return null;
   return { id: json.id, status: json.status, amount: json.amount, orderId: json.order_id };
 }

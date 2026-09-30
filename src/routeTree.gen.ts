@@ -22,6 +22,9 @@ import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as RegisterRouteImport } from './routes/register'
 import { Route as ServicesRouteImport } from './routes/services'
 import { Route as TermsRouteImport } from './routes/terms'
+import { Route as DeliveryAdminRouteImport } from './routes/delivery.admin'
+import { Route as DeliveryDashboardRouteImport } from './routes/delivery.dashboard'
+import { Route as DeliveryRequestRouteImport } from './routes/delivery.request'
 import { Route as InvoiceOrderIdRouteImport } from './routes/invoice.$orderId'
 import { Route as OrderSuccessOrderIdRouteImport } from './routes/order-success.$orderId'
 import { Route as OrdersOrderIdRouteImport } from './routes/orders.$orderId'
@@ -30,9 +33,32 @@ import { Route as ProductsIdRouteImport } from './routes/products.$id'
 import { Route as ResetPasswordTokenRouteImport } from './routes/reset-password.$token'
 import { Route as ServicesIndexRouteImport } from './routes/services.index'
 import { Route as ServicesSlugRouteImport } from './routes/services.$slug'
+import { Route as VendorAdminRouteImport } from './routes/vendor.admin'
+import { Route as VendorApplicationRouteImport } from './routes/vendor.application'
+import { Route as VendorCustomersRouteImport } from './routes/vendor.customers'
+import { Route as VendorDashboardRouteImport } from './routes/vendor.dashboard'
+import { Route as VendorNotificationsRouteImport } from './routes/vendor.notifications'
+import { Route as VendorOrdersRouteImport } from './routes/vendor.orders'
+import { Route as VendorPaymentDetailsRouteImport } from './routes/vendor.payment-details'
+import { Route as VendorPickupRouteImport } from './routes/vendor.pickup'
+import { Route as VendorProfileRouteImport } from './routes/vendor.profile'
+import { Route as VendorReceiptsRouteImport } from './routes/vendor.receipts'
+import { Route as VendorSalesRouteImport } from './routes/vendor.sales'
+import { Route as VendorSettingsRouteImport } from './routes/vendor.settings'
+import { Route as VendorShopRouteImport } from './routes/vendor.shop'
+import { Route as VendorSubscriptionRouteImport } from './routes/vendor.subscription'
+import { Route as VendorSupportRouteImport } from './routes/vendor.support'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiAuthConfigRouteImport } from './routes/api/auth.config'
 import { Route as ApiPaymentsWebhookRouteImport } from './routes/api/payments.webhook'
+import { Route as VendorInventoryIndexRouteImport } from './routes/vendor.inventory.index'
+import { Route as VendorInventoryAddRouteImport } from './routes/vendor.inventory.add'
+import { Route as VendorInventoryHistoryRouteImport } from './routes/vendor.inventory.history'
+import { Route as VendorInventoryLowStockRouteImport } from './routes/vendor.inventory.low-stock'
+import { Route as VendorInventoryStockRouteImport } from './routes/vendor.inventory.stock'
+import { Route as VendorReceiptsSubscriptionsRouteImport } from './routes/vendor.receipts.subscriptions'
+import { Route as VendorSubscriptionPaymentHistoryRouteImport } from './routes/vendor.subscription.payment-history'
+import { Route as VendorSubscriptionPlansRouteImport } from './routes/vendor.subscription.plans'
 import { Route as ApiInvoicesOrderIdPdfRouteImport } from './routes/api/invoices.$orderId.pdf'
 
 const IndexRoute = IndexRouteImport.update({
@@ -100,6 +126,21 @@ const TermsRoute = TermsRouteImport.update({
   path: '/terms',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DeliveryAdminRoute = DeliveryAdminRouteImport.update({
+  id: '/delivery/admin',
+  path: '/delivery/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DeliveryDashboardRoute = DeliveryDashboardRouteImport.update({
+  id: '/delivery/dashboard',
+  path: '/delivery/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DeliveryRequestRoute = DeliveryRequestRouteImport.update({
+  id: '/delivery/request',
+  path: '/delivery/request',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const InvoiceOrderIdRoute = InvoiceOrderIdRouteImport.update({
   id: '/invoice/$orderId',
   path: '/invoice/$orderId',
@@ -140,6 +181,81 @@ const ServicesSlugRoute = ServicesSlugRouteImport.update({
   path: '/$slug',
   getParentRoute: () => ServicesRoute,
 } as any)
+const VendorAdminRoute = VendorAdminRouteImport.update({
+  id: '/vendor/admin',
+  path: '/vendor/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VendorApplicationRoute = VendorApplicationRouteImport.update({
+  id: '/vendor/application',
+  path: '/vendor/application',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VendorCustomersRoute = VendorCustomersRouteImport.update({
+  id: '/vendor/customers',
+  path: '/vendor/customers',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VendorDashboardRoute = VendorDashboardRouteImport.update({
+  id: '/vendor/dashboard',
+  path: '/vendor/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VendorNotificationsRoute = VendorNotificationsRouteImport.update({
+  id: '/vendor/notifications',
+  path: '/vendor/notifications',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VendorOrdersRoute = VendorOrdersRouteImport.update({
+  id: '/vendor/orders',
+  path: '/vendor/orders',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VendorPaymentDetailsRoute = VendorPaymentDetailsRouteImport.update({
+  id: '/vendor/payment-details',
+  path: '/vendor/payment-details',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VendorPickupRoute = VendorPickupRouteImport.update({
+  id: '/vendor/pickup',
+  path: '/vendor/pickup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VendorProfileRoute = VendorProfileRouteImport.update({
+  id: '/vendor/profile',
+  path: '/vendor/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VendorReceiptsRoute = VendorReceiptsRouteImport.update({
+  id: '/vendor/receipts',
+  path: '/vendor/receipts',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VendorSalesRoute = VendorSalesRouteImport.update({
+  id: '/vendor/sales',
+  path: '/vendor/sales',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VendorSettingsRoute = VendorSettingsRouteImport.update({
+  id: '/vendor/settings',
+  path: '/vendor/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VendorShopRoute = VendorShopRouteImport.update({
+  id: '/vendor/shop',
+  path: '/vendor/shop',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VendorSubscriptionRoute = VendorSubscriptionRouteImport.update({
+  id: '/vendor/subscription',
+  path: '/vendor/subscription',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VendorSupportRoute = VendorSupportRouteImport.update({
+  id: '/vendor/support',
+  path: '/vendor/support',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
@@ -154,6 +270,48 @@ const ApiPaymentsWebhookRoute = ApiPaymentsWebhookRouteImport.update({
   id: '/api/payments/webhook',
   path: '/api/payments/webhook',
   getParentRoute: () => rootRouteImport,
+} as any)
+const VendorInventoryIndexRoute = VendorInventoryIndexRouteImport.update({
+  id: '/vendor/inventory/',
+  path: '/vendor/inventory/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VendorInventoryAddRoute = VendorInventoryAddRouteImport.update({
+  id: '/add',
+  path: '/add',
+  getParentRoute: () => VendorInventoryRoute,
+} as any)
+const VendorInventoryHistoryRoute = VendorInventoryHistoryRouteImport.update({
+  id: '/vendor/inventory/history',
+  path: '/vendor/inventory/history',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VendorInventoryLowStockRoute = VendorInventoryLowStockRouteImport.update({
+  id: '/vendor/inventory/low-stock',
+  path: '/vendor/inventory/low-stock',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VendorInventoryStockRoute = VendorInventoryStockRouteImport.update({
+  id: '/vendor/inventory/stock',
+  path: '/vendor/inventory/stock',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VendorReceiptsSubscriptionsRoute =
+  VendorReceiptsSubscriptionsRouteImport.update({
+    id: '/subscriptions',
+    path: '/subscriptions',
+    getParentRoute: () => VendorReceiptsRoute,
+  } as any)
+const VendorSubscriptionPaymentHistoryRoute =
+  VendorSubscriptionPaymentHistoryRouteImport.update({
+    id: '/payment-history',
+    path: '/payment-history',
+    getParentRoute: () => VendorSubscriptionRoute,
+  } as any)
+const VendorSubscriptionPlansRoute = VendorSubscriptionPlansRouteImport.update({
+  id: '/plans',
+  path: '/plans',
+  getParentRoute: () => VendorSubscriptionRoute,
 } as any)
 const ApiInvoicesOrderIdPdfRoute = ApiInvoicesOrderIdPdfRouteImport.update({
   id: '/api/invoices/$orderId/pdf',
@@ -175,17 +333,43 @@ export interface FileRoutesByFullPath {
   '/register': typeof RegisterRoute
   '/services': typeof ServicesRouteWithChildren
   '/terms': typeof TermsRoute
+  '/delivery/admin': typeof DeliveryAdminRoute
+  '/delivery/dashboard': typeof DeliveryDashboardRoute
+  '/delivery/request': typeof DeliveryRequestRoute
   '/invoice/$orderId': typeof InvoiceOrderIdRoute
   '/order-success/$orderId': typeof OrderSuccessOrderIdRoute
   '/orders/$orderId': typeof OrdersOrderIdRoute
   '/products/$id': typeof ProductsIdRoute
   '/reset-password/$token': typeof ResetPasswordTokenRoute
   '/services/$slug': typeof ServicesSlugRoute
+  '/vendor/admin': typeof VendorAdminRoute
+  '/vendor/application': typeof VendorApplicationRoute
+  '/vendor/customers': typeof VendorCustomersRoute
+  '/vendor/dashboard': typeof VendorDashboardRoute
+  '/vendor/notifications': typeof VendorNotificationsRoute
+  '/vendor/orders': typeof VendorOrdersRoute
+  '/vendor/payment-details': typeof VendorPaymentDetailsRoute
+  '/vendor/pickup': typeof VendorPickupRoute
+  '/vendor/profile': typeof VendorProfileRoute
+  '/vendor/receipts': typeof VendorReceiptsRouteWithChildren
+  '/vendor/sales': typeof VendorSalesRoute
+  '/vendor/settings': typeof VendorSettingsRoute
+  '/vendor/shop': typeof VendorShopRoute
+  '/vendor/subscription': typeof VendorSubscriptionRouteWithChildren
+  '/vendor/support': typeof VendorSupportRoute
   '/products/': typeof ProductsIndexRoute
   '/services/': typeof ServicesIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/auth/config': typeof ApiAuthConfigRoute
   '/api/payments/webhook': typeof ApiPaymentsWebhookRoute
+  '/vendor/inventory/add': typeof VendorInventoryAddRoute
+  '/vendor/inventory/history': typeof VendorInventoryHistoryRoute
+  '/vendor/inventory/low-stock': typeof VendorInventoryLowStockRoute
+  '/vendor/inventory/stock': typeof VendorInventoryStockRoute
+  '/vendor/receipts/subscriptions': typeof VendorReceiptsSubscriptionsRoute
+  '/vendor/subscription/payment-history': typeof VendorSubscriptionPaymentHistoryRoute
+  '/vendor/subscription/plans': typeof VendorSubscriptionPlansRoute
+  '/vendor/inventory/': typeof VendorInventoryIndexRoute
   '/api/invoices/$orderId/pdf': typeof ApiInvoicesOrderIdPdfRoute
 }
 export interface FileRoutesByTo {
@@ -200,17 +384,43 @@ export interface FileRoutesByTo {
   '/profile': typeof ProfileRoute
   '/register': typeof RegisterRoute
   '/terms': typeof TermsRoute
+  '/delivery/admin': typeof DeliveryAdminRoute
+  '/delivery/dashboard': typeof DeliveryDashboardRoute
+  '/delivery/request': typeof DeliveryRequestRoute
   '/invoice/$orderId': typeof InvoiceOrderIdRoute
   '/order-success/$orderId': typeof OrderSuccessOrderIdRoute
   '/orders/$orderId': typeof OrdersOrderIdRoute
   '/products/$id': typeof ProductsIdRoute
   '/reset-password/$token': typeof ResetPasswordTokenRoute
   '/services/$slug': typeof ServicesSlugRoute
+  '/vendor/admin': typeof VendorAdminRoute
+  '/vendor/application': typeof VendorApplicationRoute
+  '/vendor/customers': typeof VendorCustomersRoute
+  '/vendor/dashboard': typeof VendorDashboardRoute
+  '/vendor/notifications': typeof VendorNotificationsRoute
+  '/vendor/orders': typeof VendorOrdersRoute
+  '/vendor/payment-details': typeof VendorPaymentDetailsRoute
+  '/vendor/pickup': typeof VendorPickupRoute
+  '/vendor/profile': typeof VendorProfileRoute
+  '/vendor/receipts': typeof VendorReceiptsRouteWithChildren
+  '/vendor/sales': typeof VendorSalesRoute
+  '/vendor/settings': typeof VendorSettingsRoute
+  '/vendor/shop': typeof VendorShopRoute
+  '/vendor/subscription': typeof VendorSubscriptionRouteWithChildren
+  '/vendor/support': typeof VendorSupportRoute
   '/products': typeof ProductsIndexRoute
   '/services': typeof ServicesIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/auth/config': typeof ApiAuthConfigRoute
   '/api/payments/webhook': typeof ApiPaymentsWebhookRoute
+  '/vendor/inventory/add': typeof VendorInventoryAddRoute
+  '/vendor/inventory/history': typeof VendorInventoryHistoryRoute
+  '/vendor/inventory/low-stock': typeof VendorInventoryLowStockRoute
+  '/vendor/inventory/stock': typeof VendorInventoryStockRoute
+  '/vendor/receipts/subscriptions': typeof VendorReceiptsSubscriptionsRoute
+  '/vendor/subscription/payment-history': typeof VendorSubscriptionPaymentHistoryRoute
+  '/vendor/subscription/plans': typeof VendorSubscriptionPlansRoute
+  '/vendor/inventory': typeof VendorInventoryIndexRoute
   '/api/invoices/$orderId/pdf': typeof ApiInvoicesOrderIdPdfRoute
 }
 export interface FileRoutesById {
@@ -228,17 +438,43 @@ export interface FileRoutesById {
   '/register': typeof RegisterRoute
   '/services': typeof ServicesRouteWithChildren
   '/terms': typeof TermsRoute
+  '/delivery/admin': typeof DeliveryAdminRoute
+  '/delivery/dashboard': typeof DeliveryDashboardRoute
+  '/delivery/request': typeof DeliveryRequestRoute
   '/invoice/$orderId': typeof InvoiceOrderIdRoute
   '/order-success/$orderId': typeof OrderSuccessOrderIdRoute
   '/orders/$orderId': typeof OrdersOrderIdRoute
   '/products/$id': typeof ProductsIdRoute
   '/reset-password/$token': typeof ResetPasswordTokenRoute
   '/services/$slug': typeof ServicesSlugRoute
+  '/vendor/admin': typeof VendorAdminRoute
+  '/vendor/application': typeof VendorApplicationRoute
+  '/vendor/customers': typeof VendorCustomersRoute
+  '/vendor/dashboard': typeof VendorDashboardRoute
+  '/vendor/notifications': typeof VendorNotificationsRoute
+  '/vendor/orders': typeof VendorOrdersRoute
+  '/vendor/payment-details': typeof VendorPaymentDetailsRoute
+  '/vendor/pickup': typeof VendorPickupRoute
+  '/vendor/profile': typeof VendorProfileRoute
+  '/vendor/receipts': typeof VendorReceiptsRouteWithChildren
+  '/vendor/sales': typeof VendorSalesRoute
+  '/vendor/settings': typeof VendorSettingsRoute
+  '/vendor/shop': typeof VendorShopRoute
+  '/vendor/subscription': typeof VendorSubscriptionRouteWithChildren
+  '/vendor/support': typeof VendorSupportRoute
   '/products/': typeof ProductsIndexRoute
   '/services/': typeof ServicesIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/auth/config': typeof ApiAuthConfigRoute
   '/api/payments/webhook': typeof ApiPaymentsWebhookRoute
+  '/vendor/inventory/add': typeof VendorInventoryAddRoute
+  '/vendor/inventory/history': typeof VendorInventoryHistoryRoute
+  '/vendor/inventory/low-stock': typeof VendorInventoryLowStockRoute
+  '/vendor/inventory/stock': typeof VendorInventoryStockRoute
+  '/vendor/receipts/subscriptions': typeof VendorReceiptsSubscriptionsRoute
+  '/vendor/subscription/payment-history': typeof VendorSubscriptionPaymentHistoryRoute
+  '/vendor/subscription/plans': typeof VendorSubscriptionPlansRoute
+  '/vendor/inventory/': typeof VendorInventoryIndexRoute
   '/api/invoices/$orderId/pdf': typeof ApiInvoicesOrderIdPdfRoute
 }
 export interface FileRouteTypes {
@@ -257,17 +493,43 @@ export interface FileRouteTypes {
     | '/register'
     | '/services'
     | '/terms'
+    | '/delivery/admin'
+    | '/delivery/dashboard'
+    | '/delivery/request'
     | '/invoice/$orderId'
     | '/order-success/$orderId'
     | '/orders/$orderId'
     | '/products/$id'
     | '/reset-password/$token'
     | '/services/$slug'
+    | '/vendor/admin'
+    | '/vendor/application'
+    | '/vendor/customers'
+    | '/vendor/dashboard'
+    | '/vendor/notifications'
+    | '/vendor/orders'
+    | '/vendor/payment-details'
+    | '/vendor/pickup'
+    | '/vendor/profile'
+    | '/vendor/receipts'
+    | '/vendor/sales'
+    | '/vendor/settings'
+    | '/vendor/shop'
+    | '/vendor/subscription'
+    | '/vendor/support'
     | '/products/'
     | '/services/'
     | '/api/auth/$'
     | '/api/auth/config'
     | '/api/payments/webhook'
+    | '/vendor/inventory/add'
+    | '/vendor/inventory/history'
+    | '/vendor/inventory/low-stock'
+    | '/vendor/inventory/stock'
+    | '/vendor/receipts/subscriptions'
+    | '/vendor/subscription/payment-history'
+    | '/vendor/subscription/plans'
+    | '/vendor/inventory/'
     | '/api/invoices/$orderId/pdf'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -282,17 +544,43 @@ export interface FileRouteTypes {
     | '/profile'
     | '/register'
     | '/terms'
+    | '/delivery/admin'
+    | '/delivery/dashboard'
+    | '/delivery/request'
     | '/invoice/$orderId'
     | '/order-success/$orderId'
     | '/orders/$orderId'
     | '/products/$id'
     | '/reset-password/$token'
     | '/services/$slug'
+    | '/vendor/admin'
+    | '/vendor/application'
+    | '/vendor/customers'
+    | '/vendor/dashboard'
+    | '/vendor/notifications'
+    | '/vendor/orders'
+    | '/vendor/payment-details'
+    | '/vendor/pickup'
+    | '/vendor/profile'
+    | '/vendor/receipts'
+    | '/vendor/sales'
+    | '/vendor/settings'
+    | '/vendor/shop'
+    | '/vendor/subscription'
+    | '/vendor/support'
     | '/products'
     | '/services'
     | '/api/auth/$'
     | '/api/auth/config'
     | '/api/payments/webhook'
+    | '/vendor/inventory/add'
+    | '/vendor/inventory/history'
+    | '/vendor/inventory/low-stock'
+    | '/vendor/inventory/stock'
+    | '/vendor/receipts/subscriptions'
+    | '/vendor/subscription/payment-history'
+    | '/vendor/subscription/plans'
+    | '/vendor/inventory'
     | '/api/invoices/$orderId/pdf'
   id:
     | '__root__'
@@ -309,17 +597,43 @@ export interface FileRouteTypes {
     | '/register'
     | '/services'
     | '/terms'
+    | '/delivery/admin'
+    | '/delivery/dashboard'
+    | '/delivery/request'
     | '/invoice/$orderId'
     | '/order-success/$orderId'
     | '/orders/$orderId'
     | '/products/$id'
     | '/reset-password/$token'
     | '/services/$slug'
+    | '/vendor/admin'
+    | '/vendor/application'
+    | '/vendor/customers'
+    | '/vendor/dashboard'
+    | '/vendor/notifications'
+    | '/vendor/orders'
+    | '/vendor/payment-details'
+    | '/vendor/pickup'
+    | '/vendor/profile'
+    | '/vendor/receipts'
+    | '/vendor/sales'
+    | '/vendor/settings'
+    | '/vendor/shop'
+    | '/vendor/subscription'
+    | '/vendor/support'
     | '/products/'
     | '/services/'
     | '/api/auth/$'
     | '/api/auth/config'
     | '/api/payments/webhook'
+    | '/vendor/inventory/add'
+    | '/vendor/inventory/history'
+    | '/vendor/inventory/low-stock'
+    | '/vendor/inventory/stock'
+    | '/vendor/receipts/subscriptions'
+    | '/vendor/subscription/payment-history'
+    | '/vendor/subscription/plans'
+    | '/vendor/inventory/'
     | '/api/invoices/$orderId/pdf'
   fileRoutesById: FileRoutesById
 }
@@ -337,12 +651,34 @@ export interface RootRouteChildren {
   RegisterRoute: typeof RegisterRoute
   ServicesRoute: typeof ServicesRouteWithChildren
   TermsRoute: typeof TermsRoute
+  DeliveryAdminRoute: typeof DeliveryAdminRoute
+  DeliveryDashboardRoute: typeof DeliveryDashboardRoute
+  DeliveryRequestRoute: typeof DeliveryRequestRoute
   InvoiceOrderIdRoute: typeof InvoiceOrderIdRoute
   OrderSuccessOrderIdRoute: typeof OrderSuccessOrderIdRoute
   ResetPasswordTokenRoute: typeof ResetPasswordTokenRoute
+  VendorAdminRoute: typeof VendorAdminRoute
+  VendorApplicationRoute: typeof VendorApplicationRoute
+  VendorCustomersRoute: typeof VendorCustomersRoute
+  VendorDashboardRoute: typeof VendorDashboardRoute
+  VendorNotificationsRoute: typeof VendorNotificationsRoute
+  VendorOrdersRoute: typeof VendorOrdersRoute
+  VendorPaymentDetailsRoute: typeof VendorPaymentDetailsRoute
+  VendorPickupRoute: typeof VendorPickupRoute
+  VendorProfileRoute: typeof VendorProfileRoute
+  VendorReceiptsRoute: typeof VendorReceiptsRouteWithChildren
+  VendorSalesRoute: typeof VendorSalesRoute
+  VendorSettingsRoute: typeof VendorSettingsRoute
+  VendorShopRoute: typeof VendorShopRoute
+  VendorSubscriptionRoute: typeof VendorSubscriptionRouteWithChildren
+  VendorSupportRoute: typeof VendorSupportRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiAuthConfigRoute: typeof ApiAuthConfigRoute
   ApiPaymentsWebhookRoute: typeof ApiPaymentsWebhookRoute
+  VendorInventoryHistoryRoute: typeof VendorInventoryHistoryRoute
+  VendorInventoryLowStockRoute: typeof VendorInventoryLowStockRoute
+  VendorInventoryStockRoute: typeof VendorInventoryStockRoute
+  VendorInventoryIndexRoute: typeof VendorInventoryIndexRoute
   ApiInvoicesOrderIdPdfRoute: typeof ApiInvoicesOrderIdPdfRoute
 }
 
@@ -439,6 +775,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TermsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/delivery/admin': {
+      id: '/delivery/admin'
+      path: '/delivery/admin'
+      fullPath: '/delivery/admin'
+      preLoaderRoute: typeof DeliveryAdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/delivery/dashboard': {
+      id: '/delivery/dashboard'
+      path: '/delivery/dashboard'
+      fullPath: '/delivery/dashboard'
+      preLoaderRoute: typeof DeliveryDashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/delivery/request': {
+      id: '/delivery/request'
+      path: '/delivery/request'
+      fullPath: '/delivery/request'
+      preLoaderRoute: typeof DeliveryRequestRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/invoice/$orderId': {
       id: '/invoice/$orderId'
       path: '/invoice/$orderId'
@@ -495,6 +852,111 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ServicesSlugRouteImport
       parentRoute: typeof ServicesRoute
     }
+    '/vendor/admin': {
+      id: '/vendor/admin'
+      path: '/vendor/admin'
+      fullPath: '/vendor/admin'
+      preLoaderRoute: typeof VendorAdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/vendor/application': {
+      id: '/vendor/application'
+      path: '/vendor/application'
+      fullPath: '/vendor/application'
+      preLoaderRoute: typeof VendorApplicationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/vendor/customers': {
+      id: '/vendor/customers'
+      path: '/vendor/customers'
+      fullPath: '/vendor/customers'
+      preLoaderRoute: typeof VendorCustomersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/vendor/dashboard': {
+      id: '/vendor/dashboard'
+      path: '/vendor/dashboard'
+      fullPath: '/vendor/dashboard'
+      preLoaderRoute: typeof VendorDashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/vendor/notifications': {
+      id: '/vendor/notifications'
+      path: '/vendor/notifications'
+      fullPath: '/vendor/notifications'
+      preLoaderRoute: typeof VendorNotificationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/vendor/orders': {
+      id: '/vendor/orders'
+      path: '/vendor/orders'
+      fullPath: '/vendor/orders'
+      preLoaderRoute: typeof VendorOrdersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/vendor/payment-details': {
+      id: '/vendor/payment-details'
+      path: '/vendor/payment-details'
+      fullPath: '/vendor/payment-details'
+      preLoaderRoute: typeof VendorPaymentDetailsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/vendor/pickup': {
+      id: '/vendor/pickup'
+      path: '/vendor/pickup'
+      fullPath: '/vendor/pickup'
+      preLoaderRoute: typeof VendorPickupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/vendor/profile': {
+      id: '/vendor/profile'
+      path: '/vendor/profile'
+      fullPath: '/vendor/profile'
+      preLoaderRoute: typeof VendorProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/vendor/receipts': {
+      id: '/vendor/receipts'
+      path: '/vendor/receipts'
+      fullPath: '/vendor/receipts'
+      preLoaderRoute: typeof VendorReceiptsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/vendor/sales': {
+      id: '/vendor/sales'
+      path: '/vendor/sales'
+      fullPath: '/vendor/sales'
+      preLoaderRoute: typeof VendorSalesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/vendor/settings': {
+      id: '/vendor/settings'
+      path: '/vendor/settings'
+      fullPath: '/vendor/settings'
+      preLoaderRoute: typeof VendorSettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/vendor/shop': {
+      id: '/vendor/shop'
+      path: '/vendor/shop'
+      fullPath: '/vendor/shop'
+      preLoaderRoute: typeof VendorShopRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/vendor/subscription': {
+      id: '/vendor/subscription'
+      path: '/vendor/subscription'
+      fullPath: '/vendor/subscription'
+      preLoaderRoute: typeof VendorSubscriptionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/vendor/support': {
+      id: '/vendor/support'
+      path: '/vendor/support'
+      fullPath: '/vendor/support'
+      preLoaderRoute: typeof VendorSupportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/auth/$': {
       id: '/api/auth/$'
       path: '/api/auth/$'
@@ -515,6 +977,62 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/payments/webhook'
       preLoaderRoute: typeof ApiPaymentsWebhookRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/vendor/inventory/': {
+      id: '/vendor/inventory/'
+      path: '/vendor/inventory'
+      fullPath: '/vendor/inventory/'
+      preLoaderRoute: typeof VendorInventoryIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/vendor/inventory/add': {
+      id: '/vendor/inventory/add'
+      path: '/add'
+      fullPath: '/vendor/inventory/add'
+      preLoaderRoute: typeof VendorInventoryAddRouteImport
+      parentRoute: typeof VendorInventoryRoute
+    }
+    '/vendor/inventory/history': {
+      id: '/vendor/inventory/history'
+      path: '/vendor/inventory/history'
+      fullPath: '/vendor/inventory/history'
+      preLoaderRoute: typeof VendorInventoryHistoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/vendor/inventory/low-stock': {
+      id: '/vendor/inventory/low-stock'
+      path: '/vendor/inventory/low-stock'
+      fullPath: '/vendor/inventory/low-stock'
+      preLoaderRoute: typeof VendorInventoryLowStockRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/vendor/inventory/stock': {
+      id: '/vendor/inventory/stock'
+      path: '/vendor/inventory/stock'
+      fullPath: '/vendor/inventory/stock'
+      preLoaderRoute: typeof VendorInventoryStockRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/vendor/receipts/subscriptions': {
+      id: '/vendor/receipts/subscriptions'
+      path: '/subscriptions'
+      fullPath: '/vendor/receipts/subscriptions'
+      preLoaderRoute: typeof VendorReceiptsSubscriptionsRouteImport
+      parentRoute: typeof VendorReceiptsRoute
+    }
+    '/vendor/subscription/payment-history': {
+      id: '/vendor/subscription/payment-history'
+      path: '/payment-history'
+      fullPath: '/vendor/subscription/payment-history'
+      preLoaderRoute: typeof VendorSubscriptionPaymentHistoryRouteImport
+      parentRoute: typeof VendorSubscriptionRoute
+    }
+    '/vendor/subscription/plans': {
+      id: '/vendor/subscription/plans'
+      path: '/plans'
+      fullPath: '/vendor/subscription/plans'
+      preLoaderRoute: typeof VendorSubscriptionPlansRouteImport
+      parentRoute: typeof VendorSubscriptionRoute
     }
     '/api/invoices/$orderId/pdf': {
       id: '/api/invoices/$orderId/pdf'
@@ -565,6 +1083,31 @@ const ServicesRouteWithChildren = ServicesRoute._addFileChildren(
   ServicesRouteChildren,
 )
 
+interface VendorReceiptsRouteChildren {
+  VendorReceiptsSubscriptionsRoute: typeof VendorReceiptsSubscriptionsRoute
+}
+
+const VendorReceiptsRouteChildren: VendorReceiptsRouteChildren = {
+  VendorReceiptsSubscriptionsRoute: VendorReceiptsSubscriptionsRoute,
+}
+
+const VendorReceiptsRouteWithChildren = VendorReceiptsRoute._addFileChildren(
+  VendorReceiptsRouteChildren,
+)
+
+interface VendorSubscriptionRouteChildren {
+  VendorSubscriptionPaymentHistoryRoute: typeof VendorSubscriptionPaymentHistoryRoute
+  VendorSubscriptionPlansRoute: typeof VendorSubscriptionPlansRoute
+}
+
+const VendorSubscriptionRouteChildren: VendorSubscriptionRouteChildren = {
+  VendorSubscriptionPaymentHistoryRoute: VendorSubscriptionPaymentHistoryRoute,
+  VendorSubscriptionPlansRoute: VendorSubscriptionPlansRoute,
+}
+
+const VendorSubscriptionRouteWithChildren =
+  VendorSubscriptionRoute._addFileChildren(VendorSubscriptionRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AboutRoute: AboutRoute,
@@ -579,12 +1122,34 @@ const rootRouteChildren: RootRouteChildren = {
   RegisterRoute: RegisterRoute,
   ServicesRoute: ServicesRouteWithChildren,
   TermsRoute: TermsRoute,
+  DeliveryAdminRoute: DeliveryAdminRoute,
+  DeliveryDashboardRoute: DeliveryDashboardRoute,
+  DeliveryRequestRoute: DeliveryRequestRoute,
   InvoiceOrderIdRoute: InvoiceOrderIdRoute,
   OrderSuccessOrderIdRoute: OrderSuccessOrderIdRoute,
   ResetPasswordTokenRoute: ResetPasswordTokenRoute,
+  VendorAdminRoute: VendorAdminRoute,
+  VendorApplicationRoute: VendorApplicationRoute,
+  VendorCustomersRoute: VendorCustomersRoute,
+  VendorDashboardRoute: VendorDashboardRoute,
+  VendorNotificationsRoute: VendorNotificationsRoute,
+  VendorOrdersRoute: VendorOrdersRoute,
+  VendorPaymentDetailsRoute: VendorPaymentDetailsRoute,
+  VendorPickupRoute: VendorPickupRoute,
+  VendorProfileRoute: VendorProfileRoute,
+  VendorReceiptsRoute: VendorReceiptsRouteWithChildren,
+  VendorSalesRoute: VendorSalesRoute,
+  VendorSettingsRoute: VendorSettingsRoute,
+  VendorShopRoute: VendorShopRoute,
+  VendorSubscriptionRoute: VendorSubscriptionRouteWithChildren,
+  VendorSupportRoute: VendorSupportRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiAuthConfigRoute: ApiAuthConfigRoute,
   ApiPaymentsWebhookRoute: ApiPaymentsWebhookRoute,
+  VendorInventoryHistoryRoute: VendorInventoryHistoryRoute,
+  VendorInventoryLowStockRoute: VendorInventoryLowStockRoute,
+  VendorInventoryStockRoute: VendorInventoryStockRoute,
+  VendorInventoryIndexRoute: VendorInventoryIndexRoute,
   ApiInvoicesOrderIdPdfRoute: ApiInvoicesOrderIdPdfRoute,
 }
 export const routeTree = rootRouteImport

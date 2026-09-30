@@ -1,0 +1,7 @@
+import { useEffect, useState } from "react";
+import { createFileRoute } from "@tanstack/react-router";
+import { Bell } from "lucide-react";
+import { VendorPageHeading, VendorShell } from "@/components/vendor/vendor-shell";
+import { loadVendorNotifications } from "@/lib/api/vendor";
+export const Route = createFileRoute("/vendor/notifications")({ component: NotificationsRoute });
+function NotificationsRoute() { const [events, setEvents] = useState<Record<string, any>[]>([]); const [error, setError] = useState(""); useEffect(() => { void loadVendorNotifications().then((r) => { if (r.success) setEvents(r.notifications); else setError(r.message); }); }, []); return <VendorShell><VendorPageHeading eyebrow="Vendor workspace" title="Notifications" description="Shop-specific order, stock, subscription and Admin updates." />{error && <p role="alert" className="mb-4 text-sm text-danger">{error}</p>}<section className="card-surface divide-y divide-line">{events.map((event) => <article key={String(event.id)} className="flex gap-3 p-4"><span className="grid size-10 shrink-0 place-items-center rounded-full bg-blue-50 text-primary"><Bell className="size-5" /></span><div><p className="font-semibold">{String(event.title)}</p><p className="mt-1 text-sm text-muted">{String(event.message)}</p><p className="mt-2 text-xs text-muted">{event.created_at ? new Date(String(event.created_at)).toLocaleString("en-IN") : ""}</p></div></article>)}{events.length === 0 && <p className="p-10 text-center text-sm text-muted">No notifications yet.</p>}</section></VendorShell>; }

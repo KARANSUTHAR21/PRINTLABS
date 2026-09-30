@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { authMiddleware } from "@/lib/auth/middleware";
+import { requireRoleMiddleware } from "@/lib/auth/middleware";
 import { audit } from "@/lib/server/audit";
 import { invalidateCatalog, type ProductRow, type ServiceRow } from "@/lib/server/catalog";
 import { getSql } from "@/lib/db";
@@ -25,7 +25,7 @@ async function requireAdmin(userId: string) {
 // ── Reads ────────────────────────────────────────────────────────────────────
 
 export const adminListProducts = createServerFn({ method: "GET" })
-  .middleware([authMiddleware])
+  .middleware([requireRoleMiddleware("ADMIN")])
   .handler(async ({ context }): Promise<ApiResult<{ products: ProductRow[] }>> => {
     try {
       await requireAdmin(context.userId);
@@ -42,7 +42,7 @@ export const adminListProducts = createServerFn({ method: "GET" })
   });
 
 export const adminListServices = createServerFn({ method: "GET" })
-  .middleware([authMiddleware])
+  .middleware([requireRoleMiddleware("ADMIN")])
   .handler(async ({ context }): Promise<ApiResult<{ services: ServiceRow[] }>> => {
     try {
       await requireAdmin(context.userId);
@@ -58,7 +58,7 @@ export const adminListServices = createServerFn({ method: "GET" })
   });
 
 export const adminListOrders = createServerFn({ method: "GET" })
-  .middleware([authMiddleware])
+  .middleware([requireRoleMiddleware("ADMIN")])
   .validator(
     (data: unknown) =>
       z
@@ -111,7 +111,7 @@ export const adminListOrders = createServerFn({ method: "GET" })
   });
 
 export const adminAuditLog = createServerFn({ method: "GET" })
-  .middleware([authMiddleware])
+  .middleware([requireRoleMiddleware("ADMIN")])
   .validator((data: unknown) => z.object({ orderId: z.string().optional() }).parse(data ?? {}))
   .handler(
     async ({
@@ -180,7 +180,7 @@ const productPatch = z.object({
 });
 
 export const adminUpsertProduct = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([requireRoleMiddleware("ADMIN")])
   .validator((data: unknown) => productPatch.parse(data))
   .handler(async ({ context, data }): Promise<ApiResult<{ product: ProductRow }>> => {
     try {
@@ -220,7 +220,7 @@ export const adminUpsertProduct = createServerFn({ method: "POST" })
   });
 
 export const adminCreateProduct = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([requireRoleMiddleware("ADMIN")])
   .validator(
     (data: unknown) =>
       z
@@ -278,7 +278,7 @@ const servicePatch = z.object({
 });
 
 export const adminUpsertService = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([requireRoleMiddleware("ADMIN")])
   .validator((data: unknown) => servicePatch.parse(data))
   .handler(async ({ context, data }): Promise<ApiResult<{ service: ServiceRow }>> => {
     try {
@@ -314,7 +314,7 @@ export const adminUpsertService = createServerFn({ method: "POST" })
 const ALLOWED_TARGETS = new Set(Object.values(ORDER_TRANSITIONS).flat());
 
 export const adminSetOrderStatus = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([requireRoleMiddleware("ADMIN")])
   .validator(
     (data: unknown) =>
       z
@@ -339,25 +339,31 @@ export const adminSetOrderStatus = createServerFn({ method: "POST" })
           "ILLEGAL_TRANSITION",
         );
       }
-      // Paid orders keep their payment state; fulfilment only moves order_status.
-      await sql`
+      // Recheck the observed state in the UPDATE so stale reads cannot
+      // overwrite a concurrent payment or fulfilment transition.
+      const updated = await sql<{ id: string }>`
         update orders set
           order_status = ${data.status},
           fulfilled_at = ${data.status === "COMPLETED" ? new Date().toISOString() : null}::timestamptz,
           fulfilled_by = ${data.status === "COMPLETED" ? context.userId : null},
           cancelled_reason = ${data.status === "CANCELLED" ? (data.reason ?? "admin_cancelled") : null},
           updated_at = now()
-        where id = ${order.id}
+        where id = ${order.id} and order_status = ${order.orderStatus}
+          and payment_status = ${order.paymentStatus}
+          and (${data.status !== "COMPLETED"} or payment_status = 'PAID')
+        returning id
       `;
+      if (!updated[0]) fail("Order changed during the status update. Refresh and try again.", 409, "ORDER_UPDATE_CONFLICT");
       // Cancelling an unpaid order releases the stock reservation (same rules
       // as the customer path; the payment state machine guards paid orders).
       if (data.status === "CANCELLED" && order.paymentStatus !== "PAID") {
         const { releaseStock } = await import("@/lib/server/orders");
         await releaseStock(order.id);
         await sql`
-          update orders set payment_status = 'CANCELLED'
-          where id = ${order.id} and payment_status not in ('PAID', 'REFUNDED')
-        `;
+        update orders set payment_status = 'CANCELLED'
+        where id = ${order.id} and order_status = 'CANCELLED'
+          and payment_status not in ('PAID', 'REFUNDED')
+      `;
       }
       await audit(sql, {
         eventType: "admin_order_status",
@@ -378,13 +384,13 @@ export const adminSetOrderStatus = createServerFn({ method: "POST" })
     }
   });
 
-/** Promote/demote a user's profile role (admin bootstrap + team management). */
+/** Manage non-vendor platform roles; vendor conversion is reserved for approved applications. */
 export const adminSetUserRole = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([requireRoleMiddleware("ADMIN")])
   .validator(
     (data: unknown) =>
       z
-        .object({ userId: z.string().min(1), role: z.enum(["USER", "ADMIN"]) })
+        .object({ userId: z.string().min(1), role: z.enum(["USER", "ADMIN", "DELIVERY_PARTNER"]) })
         .parse(data),
   )
   .handler(async ({ context, data }): Promise<ApiResult<{ ok: true }>> => {

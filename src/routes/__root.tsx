@@ -1,4 +1,4 @@
-import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
+import { createRootRoute, HeadContent, Outlet, Scripts, useRouterState } from "@tanstack/react-router";
 import { Toaster } from "sonner";
 import { AuthProvider } from "@/lib/auth/provider";
 import { PreviewHostBridge } from "@/components/preview-host-bridge";
@@ -38,6 +38,8 @@ export const Route = createRootRoute({
 });
 
 function Root() {
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const isVendorWorkspace = (pathname.startsWith("/vendor/") && pathname !== "/vendor/application") || pathname === "/delivery/admin";
   return (
     <html lang="en" className="antialiased" suppressHydrationWarning>
       <head>
@@ -47,9 +49,9 @@ function Root() {
         <PreviewHostBridge />
         <AuthProvider>
           <CartProvider>
-            <Header />
+            {!isVendorWorkspace && <Header />}
             <Outlet />
-            <Footer />
+            {!isVendorWorkspace && <Footer />}
             <Toaster position="top-right" richColors />
           </CartProvider>
         </AuthProvider>

@@ -1,0 +1,5 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { FileText } from "lucide-react";
+import { VendorPageHeading, VendorShell } from "@/components/vendor/vendor-shell";
+export const Route = createFileRoute("/vendor/receipts")({ component: ReceiptsRoute });
+function ReceiptsRoute() { return <VendorShell><VendorPageHeading eyebrow="Receipts" title="Product receipts" description="Immutable payment receipts for your shop's paid customer orders." /><section className="card-surface grid min-h-64 place-items-center p-8 text-center"><div><span className="mx-auto grid size-12 place-items-center rounded-full bg-blue-50 text-primary"><FileText className="size-6" /></span><h2 className="mt-4 font-bold">Vendor receipts become available with shop checkout</h2><p className="mx-auto mt-2 max-w-lg text-sm text-muted">The existing invoice system remains unchanged. Vendor receipts will be created from server-verified payments and immutable shop-price snapshots.</p></div></section></VendorShell>; }
