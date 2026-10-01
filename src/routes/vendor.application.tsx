@@ -28,7 +28,6 @@ const EMPTY_FORM: ApplicationForm = {
 
 function ApplicationRoute() {
   const [status, setStatus] = useState<string | null>(null);
-  const [accountType, setAccountType] = useState<"CUSTOMER" | "VENDOR" | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
@@ -38,10 +37,7 @@ function ApplicationRoute() {
     void loadVendorAccess()
       .then((result) => {
         if (!alive) return;
-        if (result.success) {
-          setStatus(result.access.applicationStatus);
-          setAccountType(result.access.accountType);
-        }
+        if (result.success) setStatus(result.access.applicationStatus);
         else setError(result.message);
       })
       .catch(() => { if (alive) setError("Could not load your application status. Please refresh and try again."); });
@@ -72,12 +68,7 @@ function ApplicationRoute() {
           title="Apply to become a vendor"
           description="Tell us about your shop. PrintHub Admin reviews every application and controls approval and verification."
         />
-        {accountType === "CUSTOMER" ? (
-          <section className="card-surface mt-8 p-6">
-            <h2 className="font-bold">Customer account selected</h2>
-            <p className="mt-2 text-sm text-muted">Vendor applications are available to accounts registered as Vendor. Your account and its access stay customer-only.</p>
-          </section>
-        ) : status === "PENDING" ? (
+        {status === "PENDING" ? (
           <section className="card-surface mt-8 p-6">
             <h2 className="font-bold">Application under review</h2>
             <p className="mt-2 text-sm text-muted">We have received your shop details. The vendor workspace unlocks after Admin approval.</p>

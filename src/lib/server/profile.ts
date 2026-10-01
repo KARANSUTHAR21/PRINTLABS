@@ -1,4 +1,6 @@
 import { getSql } from "@/lib/db";
+import type { AppRole } from "@/lib/auth/roles";
+import { fail } from "./errors";
 
 export type Profile = {
   userId: string;
@@ -10,7 +12,7 @@ export type Profile = {
   pincode: string | null;
   /** Avatar as a data URL (client downscales before upload); null = none. */
   photoUrl: string | null;
-  role: "USER" | "ADMIN";
+  role: AppRole;
   createdAt: string;
 };
 
@@ -33,7 +35,7 @@ export async function ensureProfile(
     city: string | null;
     pincode: string | null;
     photo_url: string | null;
-    role: "USER" | "ADMIN";
+    role: AppRole;
     created_at: string;
   }>`
     select user_id, first_name, last_name, phone, address_line, city, pincode, photo_url, role,
@@ -76,6 +78,14 @@ export async function updateProfile(
     where user_id = ${userId}
   `;
   return ensureProfile(userId);
+}
+
+export async function requireRole(userId: string, ...allowedRoles: AppRole[]): Promise<Profile> {
+  const profile = await ensureProfile(userId);
+  if (!allowedRoles.includes(profile.role)) {
+    fail("Your account does not have permission to perform this action.", 403, "FORBIDDEN");
+  }
+  return profile;
 }
 
 export async function isAdmin(userId: string): Promise<boolean> {

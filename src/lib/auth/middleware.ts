@@ -1,5 +1,7 @@
 import { createMiddleware } from "@tanstack/react-start";
 
+import type { AppRole } from "./roles";
+
 /**
  * Auth middleware for server functions — the standard way to get the caller's
  * verified user id. When deployed the session cookie is same-origin and rides
@@ -43,5 +45,16 @@ export const authMiddleware = createMiddleware({ type: "function" })
     // Reject scripted cross-site/sibling requests before touching per-user data.
     assertSameSiteRequest();
     const userId = await requireUserId(context.bearerToken);
-    return next({ context: { userId } });
+    return next({ context: { userId, bearerToken: context.bearerToken } });
   });
+
+/** Database-backed role guard for each server function; role is re-read per call. */
+export function requireRoleMiddleware(...allowedRoles: AppRole[]) {
+  return createMiddleware({ type: "function" })
+    .middleware([authMiddleware])
+    .server(async ({ next, context }) => {
+      const { requireRole } = await import("@/lib/server/profile");
+      const profile = await requireRole(context.userId, ...allowedRoles);
+      return next({ context: { userId: context.userId, bearerToken: context.bearerToken, role: profile.role } });
+    });
+}

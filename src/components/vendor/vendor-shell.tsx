@@ -75,7 +75,6 @@ function VendorShellContent({ children }: { children: ReactNode }) {
   }
   if (!user) return <Navigate to="/login" search={{ next: pathname }} />;
   if (failed) return <main className="container-page py-20"><div className="card-surface max-w-xl p-8"><h1 className="text-2xl font-bold">Vendor workspace unavailable</h1><p className="mt-3 text-sm text-muted">We could not verify your account permissions. Please refresh or contact support.</p></div></main>;
-  if (access?.role === "USER" && access.accountType !== "VENDOR") return <Navigate to="/" />;
   if (access?.role === "USER" && pathname !== "/vendor/application") return <Navigate to="/vendor/application" />;
   if (access?.role === "USER") return <>{children}</>;
   if (access?.role !== "VENDOR" && access?.role !== "ADMIN") return <Navigate to="/" />;

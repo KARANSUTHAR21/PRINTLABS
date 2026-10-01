@@ -129,7 +129,17 @@ export async function sendMail(mail: Mail): Promise<{ sent: boolean }> {
         contentType: a.contentType,
       })),
     });
-    console.info("[email] sent via SMTP to=%s id=%s", mail.to, info.messageId ?? "-");
+    // The relay's own answer (accepted/rejected recipients + queue id) is the
+    // only way to tell "handed to the relay" apart from "the relay refused this
+    // recipient", which is what a missing reset mail usually is.
+    console.info(
+      "[email] sent via SMTP to=%s id=%s accepted=%s rejected=%s response=%s",
+      mail.to,
+      info.messageId ?? "-",
+      (info.accepted ?? []).join(",") || "-",
+      (info.rejected ?? []).join(",") || "-",
+      info.response ?? "-",
+    );
     return { sent: true };
   } catch (err) {
     // Delivery failures must never break the caller (payment/reset flows).

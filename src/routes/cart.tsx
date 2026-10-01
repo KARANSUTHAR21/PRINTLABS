@@ -2,12 +2,26 @@ import { useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Minus, Plus, Trash2 } from "lucide-react";
 import { useCart } from "@/components/cart/cart-provider";
+import { Protected } from "@/components/auth/protected";
 import { cancelPendingOrder, loadPendingOrder } from "@/lib/api/commerce";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { formatINR } from "@/lib/money";
 import type { OrderRecord } from "@/lib/server/orders";
 
-export const Route = createFileRoute("/cart")({ component: CartPage });
+export const Route = createFileRoute("/cart")({ component: CartRoute });
+
+/**
+ * The cart is per-user (server-persisted) and its "Unfinished order" block
+ * exposes order data, so the page is private like /checkout and /orders.
+ * Signed-out visitors are routed to /login with `next` back to /cart.
+ */
+function CartRoute() {
+  return (
+    <Protected>
+      <CartPage />
+    </Protected>
+  );
+}
 
 function CartPage() {
   const { cart, setQty, remove, loading } = useCart();

@@ -28,7 +28,6 @@ export type JsonRecord = Record<string, JsonValue>;
 
 export type VendorAccess = {
   role: import("@/lib/auth/roles").AppRole;
-  accountType: import("@/lib/auth/account-type").AccountType;
   applicationStatus: "PENDING" | "APPROVED" | "REJECTED" | null;
   shopId: string | null;
   shopName: string | null;
@@ -61,7 +60,6 @@ export async function getVendorAccess(userId: string): Promise<VendorAccess> {
   ` : [];
   return {
     role: profile.role,
-    accountType: profile.accountType,
     applicationStatus: applications[0]?.status ?? null,
     shopId: shops[0]?.id ?? null,
     shopName: shops[0]?.name ?? null,
@@ -96,21 +94,20 @@ export async function submitVendorApplication(userId: string, input: {
 }) {
   const profile = await ensureProfile(userId);
   if (profile.role !== "USER") fail("Only customer accounts can apply to become a vendor.", 409);
-  if (profile.accountType !== "VENDOR") fail("Choose the Vendor account type to submit a vendor application.", 403, "VENDOR_ACCOUNT_REQUIRED");
   const sql = await getSql();
   const id = newId("vapp");
   const submitted = await sql<{ id: string }>`
     insert into vendor_applications (id, user_id, business_name, contact_phone, category, address_line, city, state, pincode, status)
     select ${id}, p.user_id, ${input.businessName}, ${input.contactPhone}, ${input.category},
       ${input.addressLine}, ${input.city}, ${input.state}, ${input.pincode}, 'PENDING'
-    from user_profiles p where p.user_id = ${userId} and p.role = 'USER' and p.account_type = 'VENDOR'
+    from user_profiles p where p.user_id = ${userId} and p.role = 'USER'
     on conflict (user_id) do update set business_name = excluded.business_name,
       contact_phone = excluded.contact_phone, category = excluded.category,
       address_line = excluded.address_line, city = excluded.city, state = excluded.state,
       pincode = excluded.pincode, status = 'PENDING', submitted_at = now(),
       reviewed_at = null, reviewed_by = null, review_note = null
     where vendor_applications.status = 'REJECTED'
-      and exists (select 1 from user_profiles p where p.user_id = excluded.user_id and p.role = 'USER' and p.account_type = 'VENDOR')
+      and exists (select 1 from user_profiles p where p.user_id = excluded.user_id and p.role = 'USER')
     returning id
   `;
   if (!submitted[0]) {
@@ -156,12 +153,10 @@ export async function reviewVendorApplication(adminId: string, applicationId: st
   const trialId = newId("sub");
   const approved = await sql<{ status: string }>`
     with pending as materialized (
-      select a.* from vendor_applications a
-      join user_profiles p on p.user_id = a.user_id and p.account_type = 'VENDOR'
-      where a.id = ${applicationId} and a.status = 'PENDING' for update
+      select * from vendor_applications where id = ${applicationId} and status = 'PENDING' for update
     ), promoted as (
-      update user_profiles p set role = 'VENDOR', account_type = 'VENDOR', updated_at = now()
-      from pending a where p.user_id = a.user_id and p.role = 'USER' and p.account_type = 'VENDOR'
+      update user_profiles p set role = 'VENDOR', updated_at = now()
+      from pending a where p.user_id = a.user_id and p.role = 'USER'
       returning p.user_id
     ), created_shop as (
       insert into vendor_shops (id, vendor_id, name, phone, email, category, address_line, city, state, pincode, active, verified)

@@ -6,95 +6,6 @@ import { newId } from "./crypto-utils";
 
 export type DeliveryStatus = "ASSIGNED" | "PICKED_UP" | "DELIVERED" | "CANCELLED";
 export type DeliveryAssignment = { id: string; orderId: string; deliveryPartnerId: string; status: DeliveryStatus; assignedAt: string; pickedUpAt: string | null; deliveredAt: string | null };
-export type DeliveryPreferences = { available: boolean; updatedAt: string | null };
-
-export async function getMyDeliveryPreferences(partnerId: string): Promise<DeliveryPreferences> {
-  await requireRole(partnerId, "DELIVERY_PARTNER");
-  const sql = await getSql();
-  const [settings] = await sql<{ available: boolean; updated_at: string }>`
-    select available, updated_at::text as updated_at
-    from delivery_partner_settings where delivery_partner_id = ${partnerId} limit 1
-  `;
-  return { available: settings?.available ?? true, updatedAt: settings?.updated_at ?? null };
-}
-
-export async function setMyDeliveryAvailability(partnerId: string, available: boolean): Promise<DeliveryPreferences> {
-  await requireRole(partnerId, "DELIVERY_PARTNER");
-  const sql = await getSql();
-  const [settings] = await sql<{ available: boolean; updated_at: string }>`
-    insert into delivery_partner_settings (delivery_partner_id, available)
-    values (${partnerId}, ${available})
-    on conflict (delivery_partner_id) do update set available = excluded.available, updated_at = now()
-    returning available, updated_at::text as updated_at
-  `;
-  return { available: settings.available, updatedAt: settings.updated_at };
-}
-
-export async function listMyDeliveryHistory(partnerId: string): Promise<DeliveryAssignment[]> {
-  await requireRole(partnerId, "DELIVERY_PARTNER");
-  const sql = await getSql();
-  return sql<DeliveryAssignment>`
-    select id, order_id as "orderId", delivery_partner_id as "deliveryPartnerId", status,
-      assigned_at::text as "assignedAt", picked_up_at::text as "pickedUpAt", delivered_at::text as "deliveredAt"
-    from delivery_assignments where delivery_partner_id = ${partnerId} and status = 'DELIVERED'
-    order by delivered_at desc limit 200
-  `;
-}
-
-export async function getMyDeliveryEarningsSummary(partnerId: string) {
-  await requireRole(partnerId, "DELIVERY_PARTNER");
-  const sql = await getSql();
-  const [summary] = await sql<{ delivered_count: number; delivered_order_value_paise: number }>`
-    select count(*)::int as delivered_count, coalesce(sum(o.total_paise), 0)::int as delivered_order_value_paise
-    from delivery_assignments da join orders o on o.id = da.order_id
-    where da.delivery_partner_id = ${partnerId} and da.status = 'DELIVERED'
-      and o.payment_status = 'PAID'
-  `;
-  return {
-    deliveredCount: summary?.delivered_count ?? 0,
-    deliveredOrderValuePaise: summary?.delivered_order_value_paise ?? 0,
-    payoutsConfigured: false as const,
-  };
-}
-
-export async function listMyDeliveryNotifications(partnerId: string) {
-  await requireRole(partnerId, "DELIVERY_PARTNER");
-  const sql = await getSql();
-  return sql<{ id: string; eventType: string; title: string; message: string; readAt: string | null; createdAt: string }>`
-    select id, event_type as "eventType", title, message, read_at::text as "readAt", created_at::text as "createdAt"
-    from delivery_partner_notifications where delivery_partner_id = ${partnerId}
-    order by created_at desc limit 200
-  `;
-}
-
-export async function markMyDeliveryNotificationRead(partnerId: string, notificationId: string) {
-  await requireRole(partnerId, "DELIVERY_PARTNER");
-  const sql = await getSql();
-  const [row] = await sql<{ id: string }>`
-    update delivery_partner_notifications set read_at = coalesce(read_at, now())
-    where id = ${notificationId} and delivery_partner_id = ${partnerId}
-    returning id
-  `;
-  if (!row) fail("Delivery notification not found.", 404);
-  return { read: true as const };
-}
-
-export async function listAdminDeliveryPartners(adminId: string) {
-  await requireRole(adminId, "ADMIN");
-  const sql = await getSql();
-  return sql<{ userId: string; firstName: string; lastName: string; phone: string | null; available: boolean; activeAssignments: number; deliveredCount: number }>`
-    select p.user_id as "userId", p.first_name as "firstName", p.last_name as "lastName", p.phone,
-      coalesce(s.available, true) as available,
-      count(da.id) filter (where da.status in ('ASSIGNED', 'PICKED_UP'))::int as "activeAssignments",
-      count(da.id) filter (where da.status = 'DELIVERED')::int as "deliveredCount"
-    from user_profiles p
-    left join delivery_partner_settings s on s.delivery_partner_id = p.user_id
-    left join delivery_assignments da on da.delivery_partner_id = p.user_id
-    where p.role = 'DELIVERY_PARTNER'
-    group by p.user_id, p.first_name, p.last_name, p.phone, s.available
-    order by p.first_name, p.last_name limit 500
-  `;
-}
 
 export async function listMyDeliveryAssignments(partnerId: string): Promise<DeliveryAssignment[]> {
   await requireRole(partnerId, "DELIVERY_PARTNER");
@@ -185,9 +96,7 @@ export async function assignDeliveryRequest(adminId: string, requestId: string, 
       select r.id, r.order_id, r.user_id from delivery_assignment_requests r
       join orders o on o.id = r.order_id
       join user_profiles p on p.user_id = ${partnerId} and p.role = 'DELIVERY_PARTNER'
-      left join delivery_partner_settings partner_settings on partner_settings.delivery_partner_id = p.user_id
       where r.id = ${requestId} and r.status = 'PENDING'
-        and coalesce(partner_settings.available, true) = true
         and o.user_id = r.user_id and o.payment_status = 'PAID' and o.order_status = 'READY'
         and not exists (select 1 from delivery_assignments current_assignment where current_assignment.order_id = o.id)
       for update of r, o

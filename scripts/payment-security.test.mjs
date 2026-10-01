@@ -10,6 +10,25 @@ import test from "node:test";
 const provider = await import("../src/lib/server/provider.ts");
 const crypto = await import("../src/lib/server/crypto-utils.ts");
 const { rateLimit } = await import("../src/lib/server/rate-limit.ts");
+const { sandboxPaymentsEnabled } = provider;
+
+test("sandbox capture is disabled in production and outside workspace preview", () => {
+  const originalNodeEnv = process.env.NODE_ENV;
+  const originalProjectId = process.env.GROK_PROJECT_ID;
+  try {
+    process.env.NODE_ENV = "production";
+    delete process.env.GROK_PROJECT_ID;
+    assert.equal(sandboxPaymentsEnabled(), false);
+    process.env.NODE_ENV = "development";
+    process.env.GROK_PROJECT_ID = "deployed-project";
+    assert.equal(sandboxPaymentsEnabled(), false);
+  } finally {
+    if (originalNodeEnv === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = originalNodeEnv;
+    if (originalProjectId === undefined) delete process.env.GROK_PROJECT_ID;
+    else process.env.GROK_PROJECT_ID = originalProjectId;
+  }
+});
 
 test("payment signature verifies only for the exact order+payment pair", () => {
   const sig = provider.signPayment("order_123", "pay_456");

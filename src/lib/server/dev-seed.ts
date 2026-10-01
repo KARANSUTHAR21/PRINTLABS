@@ -26,13 +26,15 @@ const TEST_EMAIL = "razor.tester+1@example.com";
 const TEST_PASSWORD = "Passw0rd!23";
 const TEST_NAME = "Razor Tester";
 
+type SeedRole = "USER" | "ADMIN" | "DELIVERY_PARTNER";
+
 /** Better Auth credential account rows, exactly as its signup path writes them. */
 async function ensureAccount(
   pg: import("@electric-sql/pglite").PGlite,
   email: string,
   name: string,
   password: string,
-  role: "USER" | "ADMIN",
+  role: SeedRole,
 ): Promise<void> {
   const exists = await pg.query<{ count: number }>(
     `select count(*)::int as count

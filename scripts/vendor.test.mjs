@@ -24,21 +24,12 @@ test("vendor approval, shop ownership, and inventory concurrency are enforced", 
   const adminId = `vtest_admin_${run}`;
   const vendorA = `vtest_vendor_a_${run}`;
   const vendorB = `vtest_vendor_b_${run}`;
-  const customerId = `vtest_customer_${run}`;
   const productId = `vtest_product_${run}`;
   let listingA;
   let listingB;
 
   try {
-    await sql`insert into user_profiles (user_id, role, account_type) values (${adminId}, 'ADMIN', 'CUSTOMER'), (${vendorA}, 'USER', 'VENDOR'), (${vendorB}, 'USER', 'VENDOR'), (${customerId}, 'USER', 'CUSTOMER')`;
-    await assert.rejects(
-      () => submitVendorApplication(customerId, {
-        businessName: "Customer Shop", contactPhone: "+911234567890", category: "Stationery",
-        addressLine: "3 Test Road", city: "Test City", state: "Test State", pincode: "123456",
-      }),
-      /Vendor account type/i,
-      "customer accounts cannot submit vendor applications",
-    );
+    await sql`insert into user_profiles (user_id, role) values (${adminId}, 'ADMIN'), (${vendorA}, 'USER'), (${vendorB}, 'USER')`;
     await sql`
       insert into products (id, name, slug, description, category, price_paise, image, stock)
       values (${productId}, 'Vendor Test Catalog Item', ${productId}, 'test', 'Paper & Printing', 100, '/test.jpg', 10)
@@ -156,7 +147,7 @@ test("vendor approval, shop ownership, and inventory concurrency are enforced", 
     const [shopAfterAttempt] = await sql`select verified, active from vendor_shops where vendor_id = ${vendorA}`;
     assert.deepEqual(shopAfterAttempt, { verified: true, active: true }, "vendor APIs never mutate admin-owned shop status");
   } finally {
-    await sql`delete from user_profiles where user_id in (${adminId}, ${vendorA}, ${vendorB}, ${customerId})`;
+    await sql`delete from user_profiles where user_id in (${adminId}, ${vendorA}, ${vendorB})`;
     await sql`delete from products where id = ${productId}`;
   }
 });

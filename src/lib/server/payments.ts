@@ -17,9 +17,11 @@ import {
 import { getOrderForUser, type OrderRecord } from "./orders";
 import {
   createProviderOrder,
+  fetchProviderPayment,
   isLiveRazorpay,
   publicKeyId,
   signPayment,
+  sandboxPaymentsEnabled,
   verifyPaymentSignature,
   verifyWebhookSignature,
 } from "./provider";
@@ -96,50 +98,56 @@ export async function finalizePaid(input: {
   const order = await getOrderForUser(input.orderId, input.userId, true);
   if (!order) fail("Order not found.", 404);
   if (order.userId !== input.userId) fail("Forbidden.", 403);
-  if (order.paymentStatus === "PAID" || order.orderStatus === "CONFIRMED") {
-    return { order, already: true };
-  }
-  if (order.totalPaise !== input.amountPaise) fail("Payment amount does not match the order.", 409);
 
   const attempt = await getAttemptByProviderOrder(sql, input.razorpayOrderId);
   if (!attempt) fail("Payment session not found.", 404);
   if (attempt.user_id !== input.userId) fail("Forbidden.", 403);
   if (attempt.order_id !== input.orderId) fail("Payment does not belong to this order.", 409);
+  if (order.paymentStatus === "PAID" || order.orderStatus === "CONFIRMED") {
+    if (attempt.status === "PAID" && attempt.razorpay_payment_id === input.razorpayPaymentId) return { order, already: true };
+    fail("Order has already been completed with another payment.", 409);
+  }
+  if (order.totalPaise !== input.amountPaise) fail("Payment amount does not match the order.", 409);
   if (attempt.amount_paise !== input.amountPaise) fail("Payment amount does not match the order.", 409);
 
-  if (attempt.status !== "PAID") {
-    const from = attempt.status;
-    // A verified provider capture may arrive while the attempt is still
-    // PAYMENT_INITIATED (webhook-only recovery: the buyer paid and the browser
-    // never got to markPaymentOpen — spec race matrix case 3). The machine has
-    // no INITIATED→PAID edge, so walk the legal INITIATED→PROCESSING step
-    // first; PROCESSING→PAID then applies as usual.
-    if (!canTransitionPayment(from, "PAID") && canTransitionPayment(from, "PROCESSING")) {
-      await setAttemptStatus(sql, attempt.id, from, "PROCESSING");
-    }
-    const current = (await getAttempt(sql, attempt.id))?.status ?? from;
-    if (!canTransitionPayment(current, "PAID")) {
-      fail("Payment cannot be captured in its current state.", 409);
-    }
-    await sql`
-      update payment_attempts
-      set status = 'PAID',
-          razorpay_payment_id = ${input.razorpayPaymentId},
-          provider_status = 'captured',
-          updated_at = now()
-      where id = ${attempt.id} and status <> 'PAID'
-    `;
+  const from = attempt.status;
+  // A verified capture can arrive before the checkout modal marks PROCESSING.
+  // Preserve the legal transition through PROCESSING, then commit attempt and
+  // order payment state together in one database statement.
+  if (from !== "PAID" && !canTransitionPayment(from, "PAID") && canTransitionPayment(from, "PROCESSING")) {
+    await setAttemptStatus(sql, attempt.id, from, "PROCESSING");
+  }
+  const current = (await getAttempt(sql, attempt.id))?.status ?? from;
+  if (!canTransitionPayment(current, "PAID")) {
+    fail("Payment cannot be captured in its current state.", 409);
   }
 
-  await sql`
-    update orders
-    set payment_status = 'PAID',
-        order_status = 'CONFIRMED',
-        razorpay_order_id = ${input.razorpayOrderId},
-        razorpay_payment_id = ${input.razorpayPaymentId},
-        updated_at = now()
-    where id = ${order.id} and payment_status <> 'PAID'
+  const finalized = await sql<{ id: string }>`
+    with paid_attempt as (
+      update payment_attempts
+      set status = 'PAID', razorpay_payment_id = ${input.razorpayPaymentId},
+        provider_status = 'captured', updated_at = now()
+      where id = ${attempt.id} and status = ${current}
+        and (razorpay_payment_id is null or razorpay_payment_id = ${input.razorpayPaymentId})
+        and exists (select 1 from orders o where o.id = ${order.id}
+          and o.user_id = ${input.userId} and o.payment_status <> 'PAID'
+          and o.active_payment_attempt_id = payment_attempts.id)
+      returning id, order_id
+    ), paid_order as (
+      update orders o set payment_status = 'PAID', order_status = 'CONFIRMED',
+        razorpay_order_id = ${input.razorpayOrderId}, razorpay_payment_id = ${input.razorpayPaymentId}, updated_at = now()
+      from paid_attempt p
+      where o.id = p.order_id and o.user_id = ${input.userId}
+        and o.payment_status <> 'PAID' and o.active_payment_attempt_id = p.id
+      returning o.id
+    ) select id from paid_order
   `;
+  if (!finalized[0]) {
+    const fresh = await getOrderForUser(order.id, input.userId);
+    if (fresh?.paymentStatus === "PAID" && fresh.razorpayOrderId === input.razorpayOrderId &&
+        fresh.razorpayPaymentId === input.razorpayPaymentId) return { order: fresh, already: true };
+    fail("Order changed during payment capture.", 409);
+  }
 
   const paid = await getOrderForUser(order.id, order.userId, true);
   if (!paid) fail("Order missing after payment.", 500);
@@ -407,26 +415,48 @@ export async function verifyFrontendPayment(input: {
     userId: input.userId,
     metadata: { razorpayOrderId: input.razorpayOrderId },
   });
-  if (!verifyPaymentSignature(input.razorpayOrderId, input.razorpayPaymentId, input.signature)) {
-    fail("Invalid payment signature.", 400, "BAD_SIGNATURE");
-  }
   const order = await getOrderForUser(input.orderId, input.userId);
   if (!order) fail("Order not found.", 404);
   if (order.razorpayOrderId && order.razorpayOrderId !== input.razorpayOrderId) {
     fail("Payment does not belong to this order.", 409);
   }
+  const attempt = await getAttemptByProviderOrder(sql, input.razorpayOrderId);
+  if (!attempt || attempt.user_id !== input.userId || attempt.order_id !== input.orderId) {
+    fail("Payment session not found.", 404);
+  }
+  if (!verifyPaymentSignature(input.razorpayOrderId, input.razorpayPaymentId, input.signature)) {
+    fail("Invalid payment signature.", 400, "BAD_SIGNATURE");
+  }
+
+  let capturedAmount = attempt.amount_paise;
+  if (isLiveRazorpay()) {
+    // Browser callback fields are only identifiers: the provider's server API
+    // is the authority for capture state, order association, and amount.
+    const providerPayment = await fetchProviderPayment(input.razorpayPaymentId);
+    if (!providerPayment || providerPayment.id !== input.razorpayPaymentId ||
+        providerPayment.orderId !== input.razorpayOrderId || providerPayment.status !== "captured") {
+      fail("Payment has not been captured by the payment provider.", 409, "PAYMENT_NOT_CAPTURED");
+    }
+    capturedAmount = providerPayment.amount;
+  } else if (!sandboxPaymentsEnabled()) {
+    fail("Payment provider is not configured.", 503, "PAYMENT_PROVIDER_UNAVAILABLE");
+  }
+  if (capturedAmount !== order.totalPaise || capturedAmount !== attempt.amount_paise) {
+    fail("Payment amount does not match the order.", 409);
+  }
+
   const result = await finalizePaid({
     orderId: input.orderId,
     userId: input.userId,
     razorpayOrderId: input.razorpayOrderId,
     razorpayPaymentId: input.razorpayPaymentId,
-    amountPaise: order.totalPaise,
+    amountPaise: capturedAmount,
   });
   return result;
 }
 
 export async function sandboxComplete(userId: string, orderId: string, razorpayOrderId: string) {
-  if (isLiveRazorpay()) fail("Sandbox capture is disabled.", 400);
+  if (isLiveRazorpay() || !sandboxPaymentsEnabled()) fail("Sandbox capture is disabled.", 400);
   const sql = await getSql();
   const order = await getOrderForUser(orderId, userId);
   if (!order) fail("Order not found.", 404);
@@ -547,17 +577,23 @@ export async function handleWebhook(rawBody: string, signature: string | null) {
   const amount = Number(entity.amount ?? 0);
   const status = String(entity.status ?? "");
   if (!razorpayOrderId) return { ok: true };
+  if ((status === "captured" || payload.event === "payment.captured") && entity.currency !== "INR") {
+    fail("Payment webhook currency is not supported.", 400);
+  }
 
   const attempt = await getAttemptByProviderOrder(sql, razorpayOrderId);
   if (!attempt) return { ok: true };
 
   if (status === "captured" || payload.event === "payment.captured") {
+    if (!razorpayPaymentId || !Number.isSafeInteger(amount) || amount <= 0) {
+      fail("Captured payment webhook is missing a valid payment id or amount.", 400);
+    }
     await finalizePaid({
       orderId: attempt.order_id,
       userId: attempt.user_id,
       razorpayOrderId,
       razorpayPaymentId,
-      amountPaise: amount || attempt.amount_paise,
+      amountPaise: amount,
     });
   } else if (status === "failed" || payload.event === "payment.failed") {
     await failPayment(attempt.user_id, attempt.order_id, "webhook_failed");
@@ -622,17 +658,25 @@ export async function reconcileOrder(orderId: string, requesterId?: string, admi
  * (transition guards make expiry idempotent). Returns the number of attempts
  * expired this pass.
  */
-export async function reconcileStaleAttempts(limit = 100) {
+export async function reconcileStaleAttempts(limit = 100, requesterId?: string) {
   const sql = await getSql();
-  const rows = await sql<{ order_id: string }>`
-    select distinct order_id from payment_attempts
-    where status in ('CREATED', 'PAYMENT_INITIATED', 'PROCESSING')
-      and expires_at < now()
-    limit ${limit}
-  `;
+  const rows = requesterId === undefined
+    ? await sql<{ order_id: string }>`
+        select distinct order_id from payment_attempts
+        where status in ('CREATED', 'PAYMENT_INITIATED', 'PROCESSING')
+          and expires_at < now()
+        limit ${limit}
+      `
+    : await sql<{ order_id: string }>`
+        select distinct order_id from payment_attempts
+        where user_id = ${requesterId}
+          and status in ('CREATED', 'PAYMENT_INITIATED', 'PROCESSING')
+          and expires_at < now()
+        limit ${limit}
+      `;
   let expired = 0;
   for (const row of rows) {
-    await reconcileOrder(row.order_id);
+    await reconcileOrder(row.order_id, requesterId);
     expired += 1;
   }
   return { swept: rows.length, expired };
