@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireRoleMiddleware } from "@/lib/auth/middleware";
+import { requireRoleMiddleware, requireVendorApplicantMiddleware } from "@/lib/auth/middleware";
 import { asResult, ok, type ApiResult } from "@/lib/server/errors";
 import {
   addVendorProduct,
@@ -46,7 +46,7 @@ export const loadVendorAccess = createServerFn({ method: "GET" })
   });
 
 export const applyForVendor = createServerFn({ method: "POST" })
-  .middleware([requireRoleMiddleware("USER")])
+  .middleware([requireVendorApplicantMiddleware])
   .validator((data: unknown) => applicationSchema.parse(data))
   .handler(async ({ context, data }): Promise<ApiResult<{ status: "PENDING" }>> => {
     try { return ok(await submitVendorApplication(context.userId, data)); }

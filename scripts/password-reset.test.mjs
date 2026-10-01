@@ -282,6 +282,11 @@ test("a reset SETS a password for a Google-only account (it must not claim succe
   const credential = rows.find((r) => r.providerId === "credential");
   assert.ok(credential, "a credential row is created so the reset actually takes effect");
   assert.equal(
+    credential.accountId,
+    undefined,
+    "(sanity) the row is the credential account",
+  );
+  assert.equal(
     await verifyPassword({ hash: credential.password, password: "SocialReset!1" }),
     true,
     "the new password really is in the database",

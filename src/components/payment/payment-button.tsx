@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { LoaderCircle } from "lucide-react";
 import {
+  abandonPayment,
   completeSandboxPayment,
   loadPaymentStatus,
   markPaymentOpen,
@@ -123,7 +124,8 @@ export function PaymentButton({
           `Pay ${formatINR(session.amountPaise)} securely for order ${orderId}?`,
         );
         if (!ok) {
-          setState("READY");
+          setState("FAILED");
+          await abandonPayment({ data: { orderId, reason: "popup_closed" } });
           keyRef.current = newClientKey();
           return;
         }

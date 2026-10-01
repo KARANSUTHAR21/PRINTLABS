@@ -22,7 +22,7 @@ export type CredentialAccountInput = {
   passwordHash: string;
   /** OTP-verified signups have proven mailbox ownership → true. */
   emailVerified?: boolean;
-  role?: "USER" | "ADMIN" | "DELIVERY_PARTNER";
+  role?: "USER" | "ADMIN";
 };
 
 /** Postgres unique-violation (SQLSTATE 23505) — pg and PGLite both set `code`. */

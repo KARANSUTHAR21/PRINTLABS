@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { authMiddleware, requireRoleMiddleware } from "@/lib/auth/middleware";
+import { authMiddleware } from "@/lib/auth/middleware";
 import {
   addCartItem,
   clearCart,
@@ -23,6 +23,7 @@ import {
 } from "@/lib/server/orders";
 import {
   createPaymentSession,
+  failPayment,
   markProcessing,
   type PaymentSession,
   paymentStatus,
@@ -38,7 +39,7 @@ const qtySchema = z.object({
 });
 
 export const loadCart = createServerFn({ method: "GET" })
-  .middleware([requireRoleMiddleware("USER")])
+  .middleware([authMiddleware])
   .handler(async ({ context }): Promise<ApiResult<{ cart: CartView }>> => {
     try {
       const cart = await getCart(context.userId);
@@ -49,7 +50,7 @@ export const loadCart = createServerFn({ method: "GET" })
   });
 
 export const addToCart = createServerFn({ method: "POST" })
-  .middleware([requireRoleMiddleware("USER")])
+  .middleware([authMiddleware])
   .validator((data: unknown) => qtySchema.parse(data))
   .handler(async ({ context, data }): Promise<ApiResult<{ cart: CartView }>> => {
     try {
@@ -61,7 +62,7 @@ export const addToCart = createServerFn({ method: "POST" })
   });
 
 export const updateCartItem = createServerFn({ method: "POST" })
-  .middleware([requireRoleMiddleware("USER")])
+  .middleware([authMiddleware])
   .validator((data: unknown) =>
     z.object({ productId: z.string(), quantity: z.number().int().min(0).max(9999) }).parse(data),
   )
@@ -75,7 +76,7 @@ export const updateCartItem = createServerFn({ method: "POST" })
   });
 
 export const deleteCartItem = createServerFn({ method: "POST" })
-  .middleware([requireRoleMiddleware("USER")])
+  .middleware([authMiddleware])
   .validator((data: unknown) => z.object({ productId: z.string() }).parse(data))
   .handler(async ({ context, data }): Promise<ApiResult<{ cart: CartView }>> => {
     try {
@@ -87,7 +88,7 @@ export const deleteCartItem = createServerFn({ method: "POST" })
   });
 
 export const emptyCart = createServerFn({ method: "POST" })
-  .middleware([requireRoleMiddleware("USER")])
+  .middleware([authMiddleware])
   .handler(async ({ context }): Promise<ApiResult<{ cart: CartView }>> => {
     try {
       const cart = await clearCart(context.userId);
@@ -98,7 +99,7 @@ export const emptyCart = createServerFn({ method: "POST" })
   });
 
 export const mergeCart = createServerFn({ method: "POST" })
-  .middleware([requireRoleMiddleware("USER")])
+  .middleware([authMiddleware])
   .validator((data: unknown) =>
     z
       .object({
@@ -116,7 +117,7 @@ export const mergeCart = createServerFn({ method: "POST" })
   });
 
 export const placeOrder = createServerFn({ method: "POST" })
-  .middleware([requireRoleMiddleware("USER")])
+  .middleware([authMiddleware])
   .validator((data: unknown) =>
     z
       .object({
@@ -147,7 +148,7 @@ export const placeOrder = createServerFn({ method: "POST" })
   });
 
 export const loadOrders = createServerFn({ method: "GET" })
-  .middleware([requireRoleMiddleware("USER")])
+  .middleware([authMiddleware])
   .handler(async ({ context }): Promise<ApiResult<{ orders: OrderRecord[] }>> => {
     try {
       const orders = await listOrders(context.userId);
@@ -163,7 +164,7 @@ export const loadOrders = createServerFn({ method: "GET" })
  * and to offer completing or cancelling it (spec request).
  */
 export const loadPendingOrder = createServerFn({ method: "GET" })
-  .middleware([requireRoleMiddleware("USER")])
+  .middleware([authMiddleware])
   .handler(
     async ({
       context,
@@ -182,7 +183,7 @@ export const loadPendingOrder = createServerFn({ method: "GET" })
   );
 
 export const loadOrder = createServerFn({ method: "GET" })
-  .middleware([requireRoleMiddleware("USER", "ADMIN", "DELIVERY_PARTNER")])
+  .middleware([authMiddleware])
   .validator((id: unknown) => z.string().min(1).parse(id))
   .handler(async ({ context, data }): Promise<ApiResult<{ order: OrderRecord }>> => {
     try {
@@ -196,7 +197,7 @@ export const loadOrder = createServerFn({ method: "GET" })
   });
 
 export const startPayment = createServerFn({ method: "POST" })
-  .middleware([requireRoleMiddleware("USER")])
+  .middleware([authMiddleware])
   .validator((data: unknown) =>
     z.object({ orderId: z.string().min(1), idempotencyKey: z.string().min(8) }).parse(data),
   )
@@ -213,7 +214,7 @@ export const startPayment = createServerFn({ method: "POST" })
   });
 
 export const verifyPayment = createServerFn({ method: "POST" })
-  .middleware([requireRoleMiddleware("USER")])
+  .middleware([authMiddleware])
   .validator((data: unknown) =>
     z
       .object({
@@ -237,7 +238,7 @@ export const verifyPayment = createServerFn({ method: "POST" })
   });
 
 export const completeSandboxPayment = createServerFn({ method: "POST" })
-  .middleware([requireRoleMiddleware("USER")])
+  .middleware([authMiddleware])
   .validator((data: unknown) =>
     z.object({ orderId: z.string(), razorpayOrderId: z.string() }).parse(data),
   )
@@ -251,7 +252,7 @@ export const completeSandboxPayment = createServerFn({ method: "POST" })
   });
 
 export const markPaymentOpen = createServerFn({ method: "POST" })
-  .middleware([requireRoleMiddleware("USER")])
+  .middleware([authMiddleware])
   .validator((data: unknown) => z.object({ orderId: z.string() }).parse(data))
   .handler(async ({ context, data }): Promise<ApiResult<{ ok: true }>> => {
     try {
@@ -262,8 +263,20 @@ export const markPaymentOpen = createServerFn({ method: "POST" })
     }
   });
 
+export const abandonPayment = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((data: unknown) => z.object({ orderId: z.string(), reason: z.string().optional() }).parse(data))
+  .handler(async ({ context, data }): Promise<ApiResult<{ order: OrderRecord | null }>> => {
+    try {
+      const order = await failPayment(context.userId, data.orderId, data.reason ?? "user_cancelled");
+      return ok({ order });
+    } catch (err) {
+      return asResult(err);
+    }
+  });
+
 export const cancelPendingOrder = createServerFn({ method: "POST" })
-  .middleware([requireRoleMiddleware("USER")])
+  .middleware([authMiddleware])
   .validator((data: unknown) => z.object({ orderId: z.string().min(1) }).parse(data))
   .handler(async ({ context, data }): Promise<ApiResult<{ order: OrderRecord | null }>> => {
     try {
@@ -275,7 +288,7 @@ export const cancelPendingOrder = createServerFn({ method: "POST" })
   });
 
 export const loadPaymentStatus = createServerFn({ method: "GET" })
-  .middleware([requireRoleMiddleware("USER")])
+  .middleware([authMiddleware])
   .validator((orderId: unknown) => z.string().min(1).parse(orderId))
   .handler(async ({ context, data }): Promise<ApiResult<{ status: Awaited<ReturnType<typeof paymentStatus>> }>> => {
     try {
@@ -287,7 +300,7 @@ export const loadPaymentStatus = createServerFn({ method: "GET" })
   });
 
 export const loadInvoice = createServerFn({ method: "GET" })
-  .middleware([requireRoleMiddleware("USER", "ADMIN")])
+  .middleware([authMiddleware])
   .validator((orderId: unknown) => z.string().min(1).parse(orderId))
   .handler(async ({ context, data }): Promise<ApiResult<{ invoice: InvoiceRecord }>> => {
     try {
@@ -301,7 +314,7 @@ export const loadInvoice = createServerFn({ method: "GET" })
   });
 
 export const loadProfile = createServerFn({ method: "GET" })
-  .middleware([requireRoleMiddleware("USER", "VENDOR", "ADMIN", "DELIVERY_PARTNER")])
+  .middleware([authMiddleware])
   .handler(async ({ context }): Promise<ApiResult<{ profile: Profile }>> => {
     try {
       const profile = await ensureProfile(context.userId);
@@ -312,7 +325,7 @@ export const loadProfile = createServerFn({ method: "GET" })
   });
 
 export const saveProfile = createServerFn({ method: "POST" })
-  .middleware([requireRoleMiddleware("USER", "VENDOR", "ADMIN", "DELIVERY_PARTNER")])
+  .middleware([authMiddleware])
   .validator((data: unknown) =>
     z
       .object({
