@@ -22,9 +22,27 @@ import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as RegisterRouteImport } from './routes/register'
 import { Route as ServicesRouteImport } from './routes/services'
 import { Route as TermsRouteImport } from './routes/terms'
+import { Route as AdminIndexRouteImport } from './routes/admin.index'
+import { Route as AdminAuditRouteImport } from './routes/admin.audit'
+import { Route as AdminDeliveryPartnersRouteImport } from './routes/admin.delivery-partners'
+import { Route as AdminOrdersRouteImport } from './routes/admin.orders'
+import { Route as AdminPaymentsRouteImport } from './routes/admin.payments'
+import { Route as AdminProductsRouteImport } from './routes/admin.products'
+import { Route as AdminRefundsRouteImport } from './routes/admin.refunds'
+import { Route as AdminServicesRouteImport } from './routes/admin.services'
+import { Route as AdminShopsRouteImport } from './routes/admin.shops'
+import { Route as AdminSubscriptionsRouteImport } from './routes/admin.subscriptions'
+import { Route as AdminUsersRouteImport } from './routes/admin.users'
+import { Route as AdminVendorsRouteImport } from './routes/admin.vendors'
 import { Route as DeliveryAdminRouteImport } from './routes/delivery.admin'
 import { Route as DeliveryDashboardRouteImport } from './routes/delivery.dashboard'
+import { Route as DeliveryEarningsRouteImport } from './routes/delivery.earnings'
+import { Route as DeliveryHistoryRouteImport } from './routes/delivery.history'
+import { Route as DeliveryNotificationsRouteImport } from './routes/delivery.notifications'
+import { Route as DeliveryOrdersRouteImport } from './routes/delivery.orders'
+import { Route as DeliveryProfileRouteImport } from './routes/delivery.profile'
 import { Route as DeliveryRequestRouteImport } from './routes/delivery.request'
+import { Route as DeliverySettingsRouteImport } from './routes/delivery.settings'
 import { Route as InvoiceOrderIdRouteImport } from './routes/invoice.$orderId'
 import { Route as OrderSuccessOrderIdRouteImport } from './routes/order-success.$orderId'
 import { Route as OrdersOrderIdRouteImport } from './routes/orders.$orderId'
@@ -126,6 +144,66 @@ const TermsRoute = TermsRouteImport.update({
   path: '/terms',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/admin/',
+  path: '/admin/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminAuditRoute = AdminAuditRouteImport.update({
+  id: '/admin/audit',
+  path: '/admin/audit',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminDeliveryPartnersRoute = AdminDeliveryPartnersRouteImport.update({
+  id: '/admin/delivery-partners',
+  path: '/admin/delivery-partners',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminOrdersRoute = AdminOrdersRouteImport.update({
+  id: '/admin/orders',
+  path: '/admin/orders',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminPaymentsRoute = AdminPaymentsRouteImport.update({
+  id: '/admin/payments',
+  path: '/admin/payments',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminProductsRoute = AdminProductsRouteImport.update({
+  id: '/admin/products',
+  path: '/admin/products',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRefundsRoute = AdminRefundsRouteImport.update({
+  id: '/admin/refunds',
+  path: '/admin/refunds',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminServicesRoute = AdminServicesRouteImport.update({
+  id: '/admin/services',
+  path: '/admin/services',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminShopsRoute = AdminShopsRouteImport.update({
+  id: '/admin/shops',
+  path: '/admin/shops',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminSubscriptionsRoute = AdminSubscriptionsRouteImport.update({
+  id: '/admin/subscriptions',
+  path: '/admin/subscriptions',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminUsersRoute = AdminUsersRouteImport.update({
+  id: '/admin/users',
+  path: '/admin/users',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminVendorsRoute = AdminVendorsRouteImport.update({
+  id: '/admin/vendors',
+  path: '/admin/vendors',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DeliveryAdminRoute = DeliveryAdminRouteImport.update({
   id: '/delivery/admin',
   path: '/delivery/admin',
@@ -136,9 +214,39 @@ const DeliveryDashboardRoute = DeliveryDashboardRouteImport.update({
   path: '/delivery/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DeliveryEarningsRoute = DeliveryEarningsRouteImport.update({
+  id: '/delivery/earnings',
+  path: '/delivery/earnings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DeliveryHistoryRoute = DeliveryHistoryRouteImport.update({
+  id: '/delivery/history',
+  path: '/delivery/history',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DeliveryNotificationsRoute = DeliveryNotificationsRouteImport.update({
+  id: '/delivery/notifications',
+  path: '/delivery/notifications',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DeliveryOrdersRoute = DeliveryOrdersRouteImport.update({
+  id: '/delivery/orders',
+  path: '/delivery/orders',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DeliveryProfileRoute = DeliveryProfileRouteImport.update({
+  id: '/delivery/profile',
+  path: '/delivery/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DeliveryRequestRoute = DeliveryRequestRouteImport.update({
   id: '/delivery/request',
   path: '/delivery/request',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DeliverySettingsRoute = DeliverySettingsRouteImport.update({
+  id: '/delivery/settings',
+  path: '/delivery/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
 const InvoiceOrderIdRoute = InvoiceOrderIdRouteImport.update({
@@ -277,9 +385,9 @@ const VendorInventoryIndexRoute = VendorInventoryIndexRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const VendorInventoryAddRoute = VendorInventoryAddRouteImport.update({
-  id: '/add',
-  path: '/add',
-  getParentRoute: () => VendorInventoryRoute,
+  id: '/vendor/inventory/add',
+  path: '/vendor/inventory/add',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const VendorInventoryHistoryRoute = VendorInventoryHistoryRouteImport.update({
   id: '/vendor/inventory/history',
@@ -333,9 +441,26 @@ export interface FileRoutesByFullPath {
   '/register': typeof RegisterRoute
   '/services': typeof ServicesRouteWithChildren
   '/terms': typeof TermsRoute
+  '/admin/audit': typeof AdminAuditRoute
+  '/admin/delivery-partners': typeof AdminDeliveryPartnersRoute
+  '/admin/orders': typeof AdminOrdersRoute
+  '/admin/payments': typeof AdminPaymentsRoute
+  '/admin/products': typeof AdminProductsRoute
+  '/admin/refunds': typeof AdminRefundsRoute
+  '/admin/services': typeof AdminServicesRoute
+  '/admin/shops': typeof AdminShopsRoute
+  '/admin/subscriptions': typeof AdminSubscriptionsRoute
+  '/admin/users': typeof AdminUsersRoute
+  '/admin/vendors': typeof AdminVendorsRoute
   '/delivery/admin': typeof DeliveryAdminRoute
   '/delivery/dashboard': typeof DeliveryDashboardRoute
+  '/delivery/earnings': typeof DeliveryEarningsRoute
+  '/delivery/history': typeof DeliveryHistoryRoute
+  '/delivery/notifications': typeof DeliveryNotificationsRoute
+  '/delivery/orders': typeof DeliveryOrdersRoute
+  '/delivery/profile': typeof DeliveryProfileRoute
   '/delivery/request': typeof DeliveryRequestRoute
+  '/delivery/settings': typeof DeliverySettingsRoute
   '/invoice/$orderId': typeof InvoiceOrderIdRoute
   '/order-success/$orderId': typeof OrderSuccessOrderIdRoute
   '/orders/$orderId': typeof OrdersOrderIdRoute
@@ -357,6 +482,7 @@ export interface FileRoutesByFullPath {
   '/vendor/shop': typeof VendorShopRoute
   '/vendor/subscription': typeof VendorSubscriptionRouteWithChildren
   '/vendor/support': typeof VendorSupportRoute
+  '/admin/': typeof AdminIndexRoute
   '/products/': typeof ProductsIndexRoute
   '/services/': typeof ServicesIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -384,9 +510,26 @@ export interface FileRoutesByTo {
   '/profile': typeof ProfileRoute
   '/register': typeof RegisterRoute
   '/terms': typeof TermsRoute
+  '/admin/audit': typeof AdminAuditRoute
+  '/admin/delivery-partners': typeof AdminDeliveryPartnersRoute
+  '/admin/orders': typeof AdminOrdersRoute
+  '/admin/payments': typeof AdminPaymentsRoute
+  '/admin/products': typeof AdminProductsRoute
+  '/admin/refunds': typeof AdminRefundsRoute
+  '/admin/services': typeof AdminServicesRoute
+  '/admin/shops': typeof AdminShopsRoute
+  '/admin/subscriptions': typeof AdminSubscriptionsRoute
+  '/admin/users': typeof AdminUsersRoute
+  '/admin/vendors': typeof AdminVendorsRoute
   '/delivery/admin': typeof DeliveryAdminRoute
   '/delivery/dashboard': typeof DeliveryDashboardRoute
+  '/delivery/earnings': typeof DeliveryEarningsRoute
+  '/delivery/history': typeof DeliveryHistoryRoute
+  '/delivery/notifications': typeof DeliveryNotificationsRoute
+  '/delivery/orders': typeof DeliveryOrdersRoute
+  '/delivery/profile': typeof DeliveryProfileRoute
   '/delivery/request': typeof DeliveryRequestRoute
+  '/delivery/settings': typeof DeliverySettingsRoute
   '/invoice/$orderId': typeof InvoiceOrderIdRoute
   '/order-success/$orderId': typeof OrderSuccessOrderIdRoute
   '/orders/$orderId': typeof OrdersOrderIdRoute
@@ -408,6 +551,7 @@ export interface FileRoutesByTo {
   '/vendor/shop': typeof VendorShopRoute
   '/vendor/subscription': typeof VendorSubscriptionRouteWithChildren
   '/vendor/support': typeof VendorSupportRoute
+  '/admin': typeof AdminIndexRoute
   '/products': typeof ProductsIndexRoute
   '/services': typeof ServicesIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -438,9 +582,26 @@ export interface FileRoutesById {
   '/register': typeof RegisterRoute
   '/services': typeof ServicesRouteWithChildren
   '/terms': typeof TermsRoute
+  '/admin/audit': typeof AdminAuditRoute
+  '/admin/delivery-partners': typeof AdminDeliveryPartnersRoute
+  '/admin/orders': typeof AdminOrdersRoute
+  '/admin/payments': typeof AdminPaymentsRoute
+  '/admin/products': typeof AdminProductsRoute
+  '/admin/refunds': typeof AdminRefundsRoute
+  '/admin/services': typeof AdminServicesRoute
+  '/admin/shops': typeof AdminShopsRoute
+  '/admin/subscriptions': typeof AdminSubscriptionsRoute
+  '/admin/users': typeof AdminUsersRoute
+  '/admin/vendors': typeof AdminVendorsRoute
   '/delivery/admin': typeof DeliveryAdminRoute
   '/delivery/dashboard': typeof DeliveryDashboardRoute
+  '/delivery/earnings': typeof DeliveryEarningsRoute
+  '/delivery/history': typeof DeliveryHistoryRoute
+  '/delivery/notifications': typeof DeliveryNotificationsRoute
+  '/delivery/orders': typeof DeliveryOrdersRoute
+  '/delivery/profile': typeof DeliveryProfileRoute
   '/delivery/request': typeof DeliveryRequestRoute
+  '/delivery/settings': typeof DeliverySettingsRoute
   '/invoice/$orderId': typeof InvoiceOrderIdRoute
   '/order-success/$orderId': typeof OrderSuccessOrderIdRoute
   '/orders/$orderId': typeof OrdersOrderIdRoute
@@ -462,6 +623,7 @@ export interface FileRoutesById {
   '/vendor/shop': typeof VendorShopRoute
   '/vendor/subscription': typeof VendorSubscriptionRouteWithChildren
   '/vendor/support': typeof VendorSupportRoute
+  '/admin/': typeof AdminIndexRoute
   '/products/': typeof ProductsIndexRoute
   '/services/': typeof ServicesIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -493,9 +655,26 @@ export interface FileRouteTypes {
     | '/register'
     | '/services'
     | '/terms'
+    | '/admin/audit'
+    | '/admin/delivery-partners'
+    | '/admin/orders'
+    | '/admin/payments'
+    | '/admin/products'
+    | '/admin/refunds'
+    | '/admin/services'
+    | '/admin/shops'
+    | '/admin/subscriptions'
+    | '/admin/users'
+    | '/admin/vendors'
     | '/delivery/admin'
     | '/delivery/dashboard'
+    | '/delivery/earnings'
+    | '/delivery/history'
+    | '/delivery/notifications'
+    | '/delivery/orders'
+    | '/delivery/profile'
     | '/delivery/request'
+    | '/delivery/settings'
     | '/invoice/$orderId'
     | '/order-success/$orderId'
     | '/orders/$orderId'
@@ -517,6 +696,7 @@ export interface FileRouteTypes {
     | '/vendor/shop'
     | '/vendor/subscription'
     | '/vendor/support'
+    | '/admin/'
     | '/products/'
     | '/services/'
     | '/api/auth/$'
@@ -544,9 +724,26 @@ export interface FileRouteTypes {
     | '/profile'
     | '/register'
     | '/terms'
+    | '/admin/audit'
+    | '/admin/delivery-partners'
+    | '/admin/orders'
+    | '/admin/payments'
+    | '/admin/products'
+    | '/admin/refunds'
+    | '/admin/services'
+    | '/admin/shops'
+    | '/admin/subscriptions'
+    | '/admin/users'
+    | '/admin/vendors'
     | '/delivery/admin'
     | '/delivery/dashboard'
+    | '/delivery/earnings'
+    | '/delivery/history'
+    | '/delivery/notifications'
+    | '/delivery/orders'
+    | '/delivery/profile'
     | '/delivery/request'
+    | '/delivery/settings'
     | '/invoice/$orderId'
     | '/order-success/$orderId'
     | '/orders/$orderId'
@@ -568,6 +765,7 @@ export interface FileRouteTypes {
     | '/vendor/shop'
     | '/vendor/subscription'
     | '/vendor/support'
+    | '/admin'
     | '/products'
     | '/services'
     | '/api/auth/$'
@@ -597,9 +795,26 @@ export interface FileRouteTypes {
     | '/register'
     | '/services'
     | '/terms'
+    | '/admin/audit'
+    | '/admin/delivery-partners'
+    | '/admin/orders'
+    | '/admin/payments'
+    | '/admin/products'
+    | '/admin/refunds'
+    | '/admin/services'
+    | '/admin/shops'
+    | '/admin/subscriptions'
+    | '/admin/users'
+    | '/admin/vendors'
     | '/delivery/admin'
     | '/delivery/dashboard'
+    | '/delivery/earnings'
+    | '/delivery/history'
+    | '/delivery/notifications'
+    | '/delivery/orders'
+    | '/delivery/profile'
     | '/delivery/request'
+    | '/delivery/settings'
     | '/invoice/$orderId'
     | '/order-success/$orderId'
     | '/orders/$orderId'
@@ -621,6 +836,7 @@ export interface FileRouteTypes {
     | '/vendor/shop'
     | '/vendor/subscription'
     | '/vendor/support'
+    | '/admin/'
     | '/products/'
     | '/services/'
     | '/api/auth/$'
@@ -651,9 +867,26 @@ export interface RootRouteChildren {
   RegisterRoute: typeof RegisterRoute
   ServicesRoute: typeof ServicesRouteWithChildren
   TermsRoute: typeof TermsRoute
+  AdminAuditRoute: typeof AdminAuditRoute
+  AdminDeliveryPartnersRoute: typeof AdminDeliveryPartnersRoute
+  AdminOrdersRoute: typeof AdminOrdersRoute
+  AdminPaymentsRoute: typeof AdminPaymentsRoute
+  AdminProductsRoute: typeof AdminProductsRoute
+  AdminRefundsRoute: typeof AdminRefundsRoute
+  AdminServicesRoute: typeof AdminServicesRoute
+  AdminShopsRoute: typeof AdminShopsRoute
+  AdminSubscriptionsRoute: typeof AdminSubscriptionsRoute
+  AdminUsersRoute: typeof AdminUsersRoute
+  AdminVendorsRoute: typeof AdminVendorsRoute
   DeliveryAdminRoute: typeof DeliveryAdminRoute
   DeliveryDashboardRoute: typeof DeliveryDashboardRoute
+  DeliveryEarningsRoute: typeof DeliveryEarningsRoute
+  DeliveryHistoryRoute: typeof DeliveryHistoryRoute
+  DeliveryNotificationsRoute: typeof DeliveryNotificationsRoute
+  DeliveryOrdersRoute: typeof DeliveryOrdersRoute
+  DeliveryProfileRoute: typeof DeliveryProfileRoute
   DeliveryRequestRoute: typeof DeliveryRequestRoute
+  DeliverySettingsRoute: typeof DeliverySettingsRoute
   InvoiceOrderIdRoute: typeof InvoiceOrderIdRoute
   OrderSuccessOrderIdRoute: typeof OrderSuccessOrderIdRoute
   ResetPasswordTokenRoute: typeof ResetPasswordTokenRoute
@@ -672,9 +905,11 @@ export interface RootRouteChildren {
   VendorShopRoute: typeof VendorShopRoute
   VendorSubscriptionRoute: typeof VendorSubscriptionRouteWithChildren
   VendorSupportRoute: typeof VendorSupportRoute
+  AdminIndexRoute: typeof AdminIndexRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiAuthConfigRoute: typeof ApiAuthConfigRoute
   ApiPaymentsWebhookRoute: typeof ApiPaymentsWebhookRoute
+  VendorInventoryAddRoute: typeof VendorInventoryAddRoute
   VendorInventoryHistoryRoute: typeof VendorInventoryHistoryRoute
   VendorInventoryLowStockRoute: typeof VendorInventoryLowStockRoute
   VendorInventoryStockRoute: typeof VendorInventoryStockRoute
@@ -775,6 +1010,90 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TermsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/': {
+      id: '/admin/'
+      path: '/admin'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/audit': {
+      id: '/admin/audit'
+      path: '/admin/audit'
+      fullPath: '/admin/audit'
+      preLoaderRoute: typeof AdminAuditRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/delivery-partners': {
+      id: '/admin/delivery-partners'
+      path: '/admin/delivery-partners'
+      fullPath: '/admin/delivery-partners'
+      preLoaderRoute: typeof AdminDeliveryPartnersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/orders': {
+      id: '/admin/orders'
+      path: '/admin/orders'
+      fullPath: '/admin/orders'
+      preLoaderRoute: typeof AdminOrdersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/payments': {
+      id: '/admin/payments'
+      path: '/admin/payments'
+      fullPath: '/admin/payments'
+      preLoaderRoute: typeof AdminPaymentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/products': {
+      id: '/admin/products'
+      path: '/admin/products'
+      fullPath: '/admin/products'
+      preLoaderRoute: typeof AdminProductsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/refunds': {
+      id: '/admin/refunds'
+      path: '/admin/refunds'
+      fullPath: '/admin/refunds'
+      preLoaderRoute: typeof AdminRefundsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/services': {
+      id: '/admin/services'
+      path: '/admin/services'
+      fullPath: '/admin/services'
+      preLoaderRoute: typeof AdminServicesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/shops': {
+      id: '/admin/shops'
+      path: '/admin/shops'
+      fullPath: '/admin/shops'
+      preLoaderRoute: typeof AdminShopsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/subscriptions': {
+      id: '/admin/subscriptions'
+      path: '/admin/subscriptions'
+      fullPath: '/admin/subscriptions'
+      preLoaderRoute: typeof AdminSubscriptionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/users': {
+      id: '/admin/users'
+      path: '/admin/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof AdminUsersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/vendors': {
+      id: '/admin/vendors'
+      path: '/admin/vendors'
+      fullPath: '/admin/vendors'
+      preLoaderRoute: typeof AdminVendorsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/delivery/admin': {
       id: '/delivery/admin'
       path: '/delivery/admin'
@@ -789,11 +1108,53 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DeliveryDashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/delivery/earnings': {
+      id: '/delivery/earnings'
+      path: '/delivery/earnings'
+      fullPath: '/delivery/earnings'
+      preLoaderRoute: typeof DeliveryEarningsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/delivery/history': {
+      id: '/delivery/history'
+      path: '/delivery/history'
+      fullPath: '/delivery/history'
+      preLoaderRoute: typeof DeliveryHistoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/delivery/notifications': {
+      id: '/delivery/notifications'
+      path: '/delivery/notifications'
+      fullPath: '/delivery/notifications'
+      preLoaderRoute: typeof DeliveryNotificationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/delivery/orders': {
+      id: '/delivery/orders'
+      path: '/delivery/orders'
+      fullPath: '/delivery/orders'
+      preLoaderRoute: typeof DeliveryOrdersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/delivery/profile': {
+      id: '/delivery/profile'
+      path: '/delivery/profile'
+      fullPath: '/delivery/profile'
+      preLoaderRoute: typeof DeliveryProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/delivery/request': {
       id: '/delivery/request'
       path: '/delivery/request'
       fullPath: '/delivery/request'
       preLoaderRoute: typeof DeliveryRequestRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/delivery/settings': {
+      id: '/delivery/settings'
+      path: '/delivery/settings'
+      fullPath: '/delivery/settings'
+      preLoaderRoute: typeof DeliverySettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/invoice/$orderId': {
@@ -987,10 +1348,10 @@ declare module '@tanstack/react-router' {
     }
     '/vendor/inventory/add': {
       id: '/vendor/inventory/add'
-      path: '/add'
+      path: '/vendor/inventory/add'
       fullPath: '/vendor/inventory/add'
       preLoaderRoute: typeof VendorInventoryAddRouteImport
-      parentRoute: typeof VendorInventoryRoute
+      parentRoute: typeof rootRouteImport
     }
     '/vendor/inventory/history': {
       id: '/vendor/inventory/history'
@@ -1122,9 +1483,26 @@ const rootRouteChildren: RootRouteChildren = {
   RegisterRoute: RegisterRoute,
   ServicesRoute: ServicesRouteWithChildren,
   TermsRoute: TermsRoute,
+  AdminAuditRoute: AdminAuditRoute,
+  AdminDeliveryPartnersRoute: AdminDeliveryPartnersRoute,
+  AdminOrdersRoute: AdminOrdersRoute,
+  AdminPaymentsRoute: AdminPaymentsRoute,
+  AdminProductsRoute: AdminProductsRoute,
+  AdminRefundsRoute: AdminRefundsRoute,
+  AdminServicesRoute: AdminServicesRoute,
+  AdminShopsRoute: AdminShopsRoute,
+  AdminSubscriptionsRoute: AdminSubscriptionsRoute,
+  AdminUsersRoute: AdminUsersRoute,
+  AdminVendorsRoute: AdminVendorsRoute,
   DeliveryAdminRoute: DeliveryAdminRoute,
   DeliveryDashboardRoute: DeliveryDashboardRoute,
+  DeliveryEarningsRoute: DeliveryEarningsRoute,
+  DeliveryHistoryRoute: DeliveryHistoryRoute,
+  DeliveryNotificationsRoute: DeliveryNotificationsRoute,
+  DeliveryOrdersRoute: DeliveryOrdersRoute,
+  DeliveryProfileRoute: DeliveryProfileRoute,
   DeliveryRequestRoute: DeliveryRequestRoute,
+  DeliverySettingsRoute: DeliverySettingsRoute,
   InvoiceOrderIdRoute: InvoiceOrderIdRoute,
   OrderSuccessOrderIdRoute: OrderSuccessOrderIdRoute,
   ResetPasswordTokenRoute: ResetPasswordTokenRoute,
@@ -1143,9 +1521,11 @@ const rootRouteChildren: RootRouteChildren = {
   VendorShopRoute: VendorShopRoute,
   VendorSubscriptionRoute: VendorSubscriptionRouteWithChildren,
   VendorSupportRoute: VendorSupportRoute,
+  AdminIndexRoute: AdminIndexRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiAuthConfigRoute: ApiAuthConfigRoute,
   ApiPaymentsWebhookRoute: ApiPaymentsWebhookRoute,
+  VendorInventoryAddRoute: VendorInventoryAddRoute,
   VendorInventoryHistoryRoute: VendorInventoryHistoryRoute,
   VendorInventoryLowStockRoute: VendorInventoryLowStockRoute,
   VendorInventoryStockRoute: VendorInventoryStockRoute,

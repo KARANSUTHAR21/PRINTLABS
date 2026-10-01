@@ -24,6 +24,22 @@ async function requireAdmin(userId: string) {
 
 // ── Reads ────────────────────────────────────────────────────────────────────
 
+export const adminListUsers = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
+  .handler(async ({ context }): Promise<ApiResult<{ users: Array<{ userId: string; name: string; email: string; emailVerified: boolean; role: string; createdAt: string }> }>> => {
+    try {
+      await requireAdmin(context.userId);
+      const sql = await getSql();
+      const users = await sql<{ userId: string; name: string; email: string; emailVerified: boolean; role: string; createdAt: string }>`
+        select u.id as "userId", u.name, u.email, u."emailVerified",
+          coalesce(p.role, 'USER') as role, u."createdAt"::text as "createdAt"
+        from "user" u left join user_profiles p on p.user_id = u.id
+        order by u."createdAt" desc limit 500
+      `;
+      return ok({ users });
+    } catch (err) { return asResult(err); }
+  });
+
 export const adminListProducts = createServerFn({ method: "GET" })
   .middleware([requireRoleMiddleware("ADMIN")])
   .handler(async ({ context }): Promise<ApiResult<{ products: ProductRow[] }>> => {
