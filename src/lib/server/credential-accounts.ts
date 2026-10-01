@@ -23,6 +23,8 @@ export type CredentialAccountInput = {
   /** OTP-verified signups have proven mailbox ownership → true. */
   emailVerified?: boolean;
   role?: "USER" | "ADMIN" | "DELIVERY_PARTNER";
+  accountType?: "CUSTOMER" | "VENDOR";
+  accountTypeSelected?: boolean;
 };
 
 /** Postgres unique-violation (SQLSTATE 23505) — pg and PGLite both set `code`. */
@@ -107,10 +109,18 @@ export async function insertCredentialUser(input: CredentialAccountInput): Promi
   const firstName = parts[0] ?? input.name;
   const lastName = parts.slice(1).join(" ");
   await sql.query(
-    `insert into user_profiles (user_id, first_name, last_name, role)
-     values ($1, $2, $3, $4)
+    `insert into user_profiles
+       (user_id, first_name, last_name, role, account_type, account_type_selected)
+     values ($1, $2, $3, $4, $5, $6)
      on conflict (user_id) do nothing`,
-    [userId, firstName, lastName, input.role ?? "USER"],
+    [
+      userId,
+      firstName,
+      lastName,
+      input.role ?? "USER",
+      input.accountType ?? "CUSTOMER",
+      input.accountTypeSelected ?? Boolean(input.accountType),
+    ],
   );
 
   return { userId };

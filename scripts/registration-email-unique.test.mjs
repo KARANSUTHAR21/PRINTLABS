@@ -14,6 +14,7 @@ import test from "node:test";
  * Runs against PGLite with mail forced to the logged no-op.
  */
 
+process.env.DATABASE_URL = " ";
 process.env.MAIL_SERVER = "";
 process.env.BREVO_API_KEY = "";
 
@@ -21,6 +22,7 @@ const { requestRegistrationOtp, verifyRegistrationOtp } = await import(
   "../src/lib/server/registration-otp.ts"
 );
 const { insertCredentialUser } = await import("../src/lib/server/credential-accounts.ts");
+const { submitVendorApplication } = await import("../src/lib/server/vendor.ts");
 const { getSql } = await import("../src/lib/db.ts");
 const { sha256 } = await import("../src/lib/server/crypto-utils.ts");
 
@@ -30,6 +32,7 @@ const details = (email) => ({
   lastName: "Once",
   email,
   password: "Passw0rd!1",
+  accountType: "CUSTOMER",
 });
 
 /** Run `fn` while capturing the no-op mail log and return the emailed OTP. */
@@ -74,9 +77,32 @@ test("the replaced code stops working, the new one verifies", async () => {
   assert.match(result.message, /Account created/);
 
   const sql = await getSql();
-  const rows = await sql`select verified_at from registration_otps where lower(email) = ${email}`;
+  const rows = await sql`select verified_at, account_type from registration_otps where lower(email) = ${email}`;
   assert.equal(rows.length, 1);
   assert.ok(rows[0].verified_at, "the single row is marked verified");
+  assert.equal(rows[0].account_type, "CUSTOMER");
+  const [profile] = await sql`select role, account_type, account_type_selected from user_profiles where user_id = ${result.userId}`;
+  assert.deepEqual(profile, { role: "USER", account_type: "CUSTOMER", account_type_selected: true });
+});
+
+test("vendor intent survives OTP verification without granting the vendor role", async () => {
+  const email = `once.vendor.${RUN}@example.com`;
+  const code = await captureOtp(() => requestRegistrationOtp({ ...details(email), accountType: "VENDOR" }));
+  assert.ok(code);
+
+  const result = await verifyRegistrationOtp(email, code);
+  const sql = await getSql();
+  const [pending] = await sql`select account_type from registration_otps where lower(email) = ${email}`;
+  const [profile] = await sql`select role, account_type, account_type_selected from user_profiles where user_id = ${result.userId}`;
+  assert.equal(pending.account_type, "VENDOR");
+  assert.deepEqual(profile, { role: "USER", account_type: "VENDOR", account_type_selected: true });
+
+  await submitVendorApplication(result.userId, {
+    businessName: "Email Once Shop", contactPhone: "+911234567890", category: "Stationery",
+    addressLine: "1 Test Road", city: "Test City", state: "Test State", pincode: "123456",
+  });
+  const [stillUser] = await sql`select role from user_profiles where user_id = ${result.userId}`;
+  assert.equal(stillUser.role, "USER", "only Admin review grants vendor access");
 });
 
 test("casing does not create a second entry", async () => {

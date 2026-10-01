@@ -21,6 +21,7 @@ export const Route = createFileRoute("/register")({
 });
 
 type Step = "details" | "otp";
+type AccountType = "CUSTOMER" | "VENDOR";
 
 function RegisterRoute() {
   const { next } = useSearch({ from: "/register" });
@@ -34,6 +35,7 @@ function RegisterRoute() {
   const [confirm, setConfirm] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [terms, setTerms] = useState(false);
+  const [accountType, setAccountType] = useState<AccountType>("CUSTOMER");
 
   // Step 2 state
   const [step, setStep] = useState<Step>("details");
@@ -82,7 +84,7 @@ function RegisterRoute() {
     setBusy(true);
     try {
       const res = await requestRegistrationOtpFn({
-        data: { firstName: firstName.trim(), lastName: lastName.trim(), email: email.trim(), password },
+        data: { firstName: firstName.trim(), lastName: lastName.trim(), email: email.trim(), password, accountType },
       });
       if (!res.success) throw new Error(res.message);
       setExpiresAt(Date.now() + res.expiresInSeconds * 1000);
@@ -113,18 +115,19 @@ function RegisterRoute() {
       } catch {
         sessionError = true;
       }
+      const destination = res.accountType === "VENDOR" ? "/vendor/application" : safeNextPath(next);
       if (sessionError) {
         // Verified, but the automatic sign-in did not stick (offline, cookie
         // host, etc.). The account is usable, so hand the user to the login
         // page with a success notice instead of dead-ending them here.
         await navigate({
           to: "/login",
-          search: { next: safeNextPath(next), verified: email.trim() },
+          search: { next: destination, verified: email.trim() },
         });
         return;
       }
       void saveSignupProfile({ data: { firstName: firstName.trim(), lastName: lastName.trim() } });
-      await navigate({ to: safeNextPath(next) });
+      await navigate({ to: destination });
     } catch (err) {
       setVerified(false);
       setError(err instanceof Error ? err.message : "Verification failed.");
@@ -141,7 +144,7 @@ function RegisterRoute() {
     setResendBusy(true);
     try {
       const res = await requestRegistrationOtpFn({
-        data: { firstName: firstName.trim(), lastName: lastName.trim(), email: email.trim(), password },
+        data: { firstName: firstName.trim(), lastName: lastName.trim(), email: email.trim(), password, accountType },
       });
       if (!res.success) throw new Error(res.message);
       setExpiresAt(Date.now() + res.expiresInSeconds * 1000);
@@ -255,6 +258,39 @@ function RegisterRoute() {
           </p>
           {emailAndPasswordEnabled && (
             <form className="mt-9 space-y-7" onSubmit={(e) => void submitDetails(e)}>
+              <fieldset>
+                <legend className="field-label">I want to join as</legend>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-line p-4 has-[:checked]:border-primary has-[:checked]:bg-primary/5">
+                    <input
+                      type="radio"
+                      name="accountType"
+                      value="CUSTOMER"
+                      checked={accountType === "CUSTOMER"}
+                      onChange={() => setAccountType("CUSTOMER")}
+                      className="mt-1 accent-primary"
+                    />
+                    <span>
+                      <span className="block font-semibold text-ink">Customer</span>
+                      <span className="mt-1 block text-sm text-muted">Shop products and services on PrintHub.</span>
+                    </span>
+                  </label>
+                  <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-line p-4 has-[:checked]:border-primary has-[:checked]:bg-primary/5">
+                    <input
+                      type="radio"
+                      name="accountType"
+                      value="VENDOR"
+                      checked={accountType === "VENDOR"}
+                      onChange={() => setAccountType("VENDOR")}
+                      className="mt-1 accent-primary"
+                    />
+                    <span>
+                      <span className="block font-semibold text-ink">Vendor</span>
+                      <span className="mt-1 block text-sm text-muted">Apply to list your shop. Admin approval is required.</span>
+                    </span>
+                  </label>
+                </div>
+              </fieldset>
               <div className="grid gap-5 sm:grid-cols-2">
                 <label className="block">
                   <span className="field-label block">First Name</span>
@@ -391,9 +427,15 @@ function RegisterRoute() {
               </button>
             </form>
           )}
-          <div className="mt-10">
-            <SocialButtons next={next} />
-          </div>
+          {accountType === "CUSTOMER" ? (
+            <div className="mt-10">
+              <SocialButtons next={next} />
+            </div>
+          ) : (
+            <p className="mt-6 text-center text-sm text-muted">
+              Vendor registration uses email verification so your application intent is saved securely.
+            </p>
+          )}
           <p className="mt-8 text-center text-[0.95rem] text-muted">
             Already have an account?{" "}
             <Link to="/login" search={{ next }} className="font-semibold text-primary">

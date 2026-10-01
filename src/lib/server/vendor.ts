@@ -93,28 +93,36 @@ export async function submitVendorApplication(userId: string, input: {
   addressLine: string; city: string; state: string; pincode: string;
 }) {
   const profile = await ensureProfile(userId);
-  if (profile.role !== "USER") fail("Only customer accounts can apply to become a vendor.", 409);
+  if (profile.role !== "USER") fail("Only user accounts can submit a vendor application.", 409);
   const sql = await getSql();
+  const [intent] = await sql<{ account_type: string; account_type_selected: boolean }>`
+    select account_type, account_type_selected from user_profiles where user_id = ${userId} limit 1
+  `;
+  if (intent?.account_type !== "VENDOR" || !intent.account_type_selected) {
+    fail("Select Vendor during registration before submitting an application.", 409, "VENDOR_INTENT_REQUIRED");
+  }
   const id = newId("vapp");
   const submitted = await sql<{ id: string }>`
     insert into vendor_applications (id, user_id, business_name, contact_phone, category, address_line, city, state, pincode, status)
     select ${id}, p.user_id, ${input.businessName}, ${input.contactPhone}, ${input.category},
       ${input.addressLine}, ${input.city}, ${input.state}, ${input.pincode}, 'PENDING'
     from user_profiles p where p.user_id = ${userId} and p.role = 'USER'
+      and p.account_type = 'VENDOR' and p.account_type_selected = true
     on conflict (user_id) do update set business_name = excluded.business_name,
       contact_phone = excluded.contact_phone, category = excluded.category,
       address_line = excluded.address_line, city = excluded.city, state = excluded.state,
       pincode = excluded.pincode, status = 'PENDING', submitted_at = now(),
       reviewed_at = null, reviewed_by = null, review_note = null
     where vendor_applications.status = 'REJECTED'
-      and exists (select 1 from user_profiles p where p.user_id = excluded.user_id and p.role = 'USER')
+      and exists (select 1 from user_profiles p where p.user_id = excluded.user_id
+        and p.role = 'USER' and p.account_type = 'VENDOR' and p.account_type_selected = true)
     returning id
   `;
   if (!submitted[0]) {
     const [current] = await sql<{ status: string }>`select status from vendor_applications where user_id = ${userId} limit 1`;
     if (current?.status === "PENDING") fail("Your vendor application is already under review.", 409);
     if (current?.status === "APPROVED") fail("Your vendor application has already been approved.", 409);
-    fail("Only customer accounts can apply to become a vendor.", 409);
+    fail("Vendor account selection is required to submit an application.", 409, "VENDOR_INTENT_REQUIRED");
   }
   return { status: "PENDING" as const };
 }

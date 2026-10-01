@@ -118,6 +118,7 @@ const registrationSchema = z.object({
   firstName: z.string().trim().min(1).max(80),
   lastName: z.string().trim().min(1).max(80),
   email: z.string().trim().email().max(254),
+  accountType: z.enum(["CUSTOMER", "VENDOR"]),
   password: z
     .string()
     .min(8, "Password must be at least 8 characters.")
@@ -145,7 +146,7 @@ export const verifyRegistrationOtpFn = createServerFn({ method: "POST" })
       .object({ email: z.string().trim().email(), code: z.string().trim().regex(/^\d{6}$/) })
       .parse(data),
   )
-  .handler(async ({ data }): Promise<ApiResult<{ message: string; userId: string }>> => {
+  .handler(async ({ data }): Promise<ApiResult<{ message: string; userId: string; accountType: "CUSTOMER" | "VENDOR" }>> => {
     try {
       const result = await verifyRegistrationOtp(data.email, data.code);
       return ok(result);

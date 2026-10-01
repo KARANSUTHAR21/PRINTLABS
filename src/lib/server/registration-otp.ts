@@ -29,6 +29,7 @@ export type RegistrationRequestInput = {
   lastName: string;
   email: string;
   password: string;
+  accountType?: "CUSTOMER" | "VENDOR";
 };
 
 export type RegistrationRequestResult = {
@@ -71,11 +72,12 @@ export async function requestRegistrationOtp(
   // REPLACES the pending code — new hash, new expiry, attempts reset — instead
   // of inserting a second row for the same email and then invalidating it.
   await sql`
-    insert into registration_otps (id, email, name, password_hash, code_hash, expires_at)
-    values (${newId("rot")}, ${email}, ${name}, ${passwordHash}, ${sha256(code)}, ${expires})
+    insert into registration_otps (id, email, name, password_hash, code_hash, expires_at, account_type)
+    values (${newId("rot")}, ${email}, ${name}, ${passwordHash}, ${sha256(code)}, ${expires}, ${input.accountType ?? "CUSTOMER"})
     on conflict (lower(email)) do update set
       name = excluded.name,
       password_hash = excluded.password_hash,
+      account_type = excluded.account_type,
       code_hash = excluded.code_hash,
       expires_at = excluded.expires_at,
       attempts = 0,
@@ -98,6 +100,7 @@ export type RegistrationVerifyResult = {
   message: string;
   /** The new user's id — the client uses it to establish the session. */
   userId: string;
+  accountType: "CUSTOMER" | "VENDOR";
 };
 
 export async function verifyRegistrationOtp(
@@ -117,8 +120,9 @@ export async function verifyRegistrationOtp(
     code_hash: string;
     attempts: number;
     expires_at: string;
+    account_type: "CUSTOMER" | "VENDOR";
   }>`
-    select id, name, password_hash, code_hash, attempts, expires_at::text as expires_at
+    select id, name, password_hash, code_hash, attempts, account_type, expires_at::text as expires_at
     from registration_otps
     where lower(email) = ${normalized} and verified_at is null and consumed_at is null
     order by created_at desc limit 1
@@ -156,6 +160,8 @@ export async function verifyRegistrationOtp(
     name: row.name,
     passwordHash: row.password_hash,
     emailVerified: true, // mailbox proven by OTP
+    accountType: row.account_type,
+    accountTypeSelected: true,
   });
-  return { message: "Account created. Welcome to PrintHub!", userId };
+  return { message: "Account created. Welcome to PrintHub!", userId, accountType: row.account_type };
 }

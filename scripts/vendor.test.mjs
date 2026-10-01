@@ -3,6 +3,7 @@ import test from "node:test";
 
 // This integration test always uses a fresh in-memory database, never a .env DB.
 process.env.DATABASE_URL = " ";
+process.env.VITE_AUTH_ENABLED = "false";
 const { dbSource, getSql } = await import("../src/lib/db.ts");
 assert.equal(dbSource, "pglite", "vendor tests must never connect to a configured database");
 const {
@@ -24,23 +25,40 @@ test("vendor approval, shop ownership, and inventory concurrency are enforced", 
   const adminId = `vtest_admin_${run}`;
   const vendorA = `vtest_vendor_a_${run}`;
   const vendorB = `vtest_vendor_b_${run}`;
+  const customerId = `vtest_customer_${run}`;
   const productId = `vtest_product_${run}`;
   let listingA;
   let listingB;
 
   try {
-    await sql`insert into user_profiles (user_id, role) values (${adminId}, 'ADMIN'), (${vendorA}, 'USER'), (${vendorB}, 'USER')`;
+    await sql`
+      insert into user_profiles (user_id, role, account_type, account_type_selected)
+      values (${adminId}, 'ADMIN', 'CUSTOMER', true),
+        (${vendorA}, 'USER', 'VENDOR', true),
+        (${vendorB}, 'USER', 'VENDOR', true),
+        (${customerId}, 'USER', 'CUSTOMER', true)
+    `;
     await sql`
       insert into products (id, name, slug, description, category, price_paise, image, stock)
       values (${productId}, 'Vendor Test Catalog Item', ${productId}, 'test', 'Paper & Printing', 100, '/test.jpg', 10)
     `;
 
+    await assert.rejects(
+      () => submitVendorApplication(customerId, {
+        businessName: "Customer Shop", contactPhone: "+911112223333", category: "Stationery",
+        addressLine: "3 Test Road", city: "Test City", state: "Test State", pincode: "112233",
+      }),
+      (error) => error.code === "VENDOR_INTENT_REQUIRED",
+      "customer registrations cannot submit vendor applications",
+    );
     await submitVendorApplication(vendorA, {
       businessName: "Vendor A Shop", contactPhone: "+911234567890", category: "Stationery",
       addressLine: "1 Test Road", city: "Test City", state: "Test State", pincode: "123456",
     });
     const [application] = await sql`select id from vendor_applications where user_id = ${vendorA}`;
     assert.ok(application?.id, "application is persisted");
+    const [unapprovedProfile] = await sql`select role from user_profiles where user_id = ${vendorA}`;
+    assert.equal(unapprovedProfile.role, "USER", "selecting vendor intent and applying does not grant vendor access");
 
     const approval = await reviewVendorApplication(adminId, application.id, "APPROVED", "Verified identity documents");
     assert.equal(approval.status, "APPROVED");
@@ -147,7 +165,7 @@ test("vendor approval, shop ownership, and inventory concurrency are enforced", 
     const [shopAfterAttempt] = await sql`select verified, active from vendor_shops where vendor_id = ${vendorA}`;
     assert.deepEqual(shopAfterAttempt, { verified: true, active: true }, "vendor APIs never mutate admin-owned shop status");
   } finally {
-    await sql`delete from user_profiles where user_id in (${adminId}, ${vendorA}, ${vendorB})`;
+    await sql`delete from user_profiles where user_id in (${adminId}, ${vendorA}, ${vendorB}, ${customerId})`;
     await sql`delete from products where id = ${productId}`;
   }
 });
